@@ -1,0 +1,1702 @@
+
+let currentSwimlane = null, currentSection = null, currentActivity = null, editMode = false;
+let editSectionMode = false, currentEditSection = null;
+let editingStageId = null, selectedStageColor = null;
+let dragState = null, draggedSection = null, draggedActivity = null;
+let isDarkMode = true;
+const tooltip = document.getElementById('tooltip');
+
+function getStageEnds() {
+    const count = ganttData.stages.length;
+    return ganttData.stages.map((_, i) => ((i + 1) / count) * 100);
+}
+
+function getStageWidth() {
+    return 100 / ganttData.stages.length;
+}
+
+function snapToStageEnd(pos) {
+    const ends = getStageEnds();
+    let closest = ends[0], minDist = Math.abs(pos - closest);
+    for (const end of ends) {
+        const dist = Math.abs(pos - end);
+        if (dist < minDist) { minDist = dist; closest = end; }
+    }
+    return closest;
+}
+
+function toggleTheme() {
+    isDarkMode = !isDarkMode;
+    document.documentElement.classList.toggle('light', !isDarkMode);
+    document.getElementById('theme-icon').textContent = isDarkMode ? '🌙' : '☀️';
+    document.getElementById('theme-label').textContent = isDarkMode ? 'Dark' : 'Light';
+    localStorage.setItem('pricefx-gantt-theme', isDarkMode ? 'dark' : 'light');
+}
+
+function loadTheme() {
+    const saved = localStorage.getItem('pricefx-gantt-theme');
+    if (saved === 'light') {
+        isDarkMode = false;
+        document.documentElement.classList.add('light');
+        document.getElementById('theme-icon').textContent = '☀️';
+        document.getElementById('theme-label').textContent = 'Light';
+    }
+}
+
+function findActivityById(id) {
+    for (const sl of ganttData.swimlanes) {
+        for (const sec of sl.sections) {
+            const act = sec.activities.find(a => a.id === id);
+            if (act) return { activity: act, section: sec, swimlane: sl };
+        }
+    }
+    return null;
+}
+
+function getSuccessors(activityId) {
+    const successors = [];
+    ganttData.swimlanes.forEach(sl => {
+        sl.sections.forEach(sec => {
+            sec.activities.forEach(act => {
+                const hasPredecessor = act.predecessor === activityId || 
+                    (Array.isArray(act.predecessors) && act.predecessors.includes(activityId));
+                if (hasPredecessor) successors.push({ activity: act, section: sec, swimlane: sl });
+            });
+        });
+    });
+    return successors;
+}
+
+function getPredecessors(activityId) {
+    const result = findActivityById(activityId);
+    if (!result) return [];
+    const act = result.activity;
+    if (Array.isArray(act.predecessors) && act.predecessors.length > 0) {
+        return act.predecessors;
+    } else if (act.predecessor) {
+        return [act.predecessor];
+    }
+    return [];
+}
+
+function hasFriction(act) { return act.friction && act.friction.trim().length > 0; }
+function hasNotes(act) { return act.notes && act.notes.trim().length > 0; }
+
+function updateGridTemplates() {
+    const stageCount = ganttData.stages.length;
+    const stageCols = `repeat(${stageCount}, 1fr)`;
+    document.querySelectorAll('.stage-headers').forEach(el => {
+        el.style.gridTemplateColumns = `${ACTIVITY_COL_WIDTH}px ${stageCols}`;
+    });
+    document.querySelectorAll('.swimlane-header, .section-header, .activity-row').forEach(el => {
+        el.style.gridTemplateColumns = `${ACTIVITY_COL_WIDTH}px 1fr`;
+    });
+    document.querySelectorAll('.stage-dividers, .section-chart').forEach(el => {
+        el.style.gridTemplateColumns = stageCols;
+    });
+}
+
+function render() {
+    renderLegend();
+    renderStageHeaders();
+    renderSwimlanes();
+    updateGridTemplates();
+    attachDragListeners();
+    attachTooltipListeners();
+    attachReorderListeners();
+}
+
+function renderLegend() {
+    const container = document.getElementById('legend');
+    let html = '';
+    
+    // Add swimlane colors
+    ganttData.swimlanes.forEach(sl => {
+        html += `<div class="legend-item"><div class="legend-bar" style="background:${sl.color}"></div>${sl.name}</div>`;
+    });
+    
+    // Add shared indicator
+    html += `<div class="legend-item"><div class="legend-bar" style="background:var(--shared-color)"></div>Shared</div>`;
+    
+    // Add exit gate
+    html += `<div class="legend-item"><div class="legend-gate"></div>Exit Gate</div>`;
+    
+    // Add deliverable
+    html += `<div class="legend-item"><div class="legend-icon deliverable">D</div>Deliverable</div>`;
+    
+    container.innerHTML = html;
+}
+
+function renderStageHeaders() {
+    const container = document.getElementById('stage-headers');
+    let html = '<div class="header-spacer">ACTIVITIES</div>';
+    ganttData.stages.forEach((stage, i) => {
+        const stageNum = stage.num !== undefined ? stage.num : (i + 1);
+        html += `<div class="stage-header" data-stage-id="${stage.id}">
+            <div class="stage-color-bar" style="background:${stage.color}"></div>
+            <div class="stage-header-content">
+                <div class="stage-num">STAGE ${stageNum}</div>
+                <div class="stage-name">${stage.name}</div>
+            </div>
+        </div>`;
+    });
+    container.innerHTML = html;
+}
+
+function renderSwimlanes() {
+    const container = document.getElementById('gantt-content');
+    container.innerHTML = '';
+    const stageCount = ganttData.stages.length;
+    const stageCols = `repeat(${stageCount}, 1fr)`;
+    
+    ganttData.swimlanes.forEach(sl => {
+        const el = document.createElement('div');
+        el.className = 'swimlane';
+        el.dataset.swimlaneId = sl.id;
+        
+        let sectionsHtml = sl.collapsed ? '' : sl.sections.map(sec => renderSection(sl, sec, stageCols)).join('');
+        
+        let dividers = '';
+        for (let i = 0; i < stageCount; i++) dividers += '<div class="stage-divider"></div>';
+        
+        const totalActivities = sl.sections.reduce((sum, sec) => sum + sec.activities.length, 0);
+        const slColor = sl.color || '#58a6ff';
+        
+        el.innerHTML = `
+            <div class="swimlane-header" style="grid-template-columns: ${ACTIVITY_COL_WIDTH}px 1fr;">
+                <div class="swimlane-label" style="color: ${slColor};">
+                    <div class="swimlane-label-text" onclick="toggleSwimlaneCollapse('${sl.id}')" style="cursor:pointer;">
+                        <span class="swimlane-collapse ${sl.collapsed ? 'collapsed' : ''}">▼</span>
+                        <div class="swimlane-dot" style="background: ${slColor};"></div>
+                        <span>${sl.name}</span>
+                        <span class="swimlane-count">${totalActivities}</span>
+                    </div>
+                    <div class="swimlane-actions">
+                        <button class="add-btn" onclick="openSectionModal('${sl.id}')" ${sl.collapsed ? 'disabled style="opacity:0.4;"' : ''}>+ Section</button>
+                        <button class="add-btn" onclick="openAddActivityModal('${sl.id}')" ${sl.collapsed ? 'disabled style="opacity:0.4;"' : ''}>+ Activity</button>
+                        <button class="add-btn" onclick="openEditSwimlaneModal('${sl.id}')" title="Edit">✎</button>
+                        <button class="add-btn" onclick="deleteSwimlane('${sl.id}')" title="Delete" ${ganttData.swimlanes.length <= 1 ? 'disabled style="opacity:0.4;"' : ''}>✕</button>
+                    </div>
+                </div>
+                <div class="stage-dividers" style="grid-template-columns: ${stageCols};">${dividers}</div>
+            </div>
+            <div class="swimlane-content ${sl.collapsed ? 'collapsed' : ''}">${sectionsHtml}</div>
+        `;
+        container.appendChild(el);
+    });
+    
+    // Add "Add Swimlane" button at the end
+    const addBtn = document.createElement('div');
+    addBtn.className = 'add-swimlane-row';
+    addBtn.innerHTML = `<button class="btn" onclick="openAddSwimlaneModal()">+ Add Swimlane</button>`;
+    container.appendChild(addBtn);
+}
+
+function renderSection(sl, sec, stageCols) {
+    const stageCount = ganttData.stages.length;
+    let chartBgs = '';
+    for (let i = 0; i < stageCount; i++) chartBgs += '<div class="section-chart-bg"></div>';
+    
+    const actCount = sec.activities.length;
+    let activitiesHtml = actCount === 0 
+        ? `<div class="empty-lane" data-section-id="${sec.id}" data-swimlane-id="${sl.id}">Drop activities here or click "+ Activity" on this section</div>` 
+        : sec.activities.map(act => renderActivityRow(sl, sec, act, stageCols)).join('');
+    
+    return `
+        <div class="section-group" data-section-id="${sec.id}" data-swimlane-id="${sl.id}">
+            <div class="section-header" data-section-id="${sec.id}" data-swimlane-id="${sl.id}" style="grid-template-columns: ${ACTIVITY_COL_WIDTH}px 1fr;">
+                <div class="section-label" onclick="toggleSectionCollapse('${sl.id}', '${sec.id}')">
+                    <span class="section-collapse ${sec.collapsed ? 'collapsed' : ''}">▼</span>
+                    <span class="section-drag-handle" draggable="true" data-section-id="${sec.id}" data-swimlane-id="${sl.id}">☰</span>
+                    <span class="section-name">${sec.name}</span>
+                    <span class="section-count">${actCount}</span>
+                    <div class="section-actions">
+                        <button class="section-action-btn" onclick="event.stopPropagation();openAddActivityToSectionModal('${sl.id}','${sec.id}')" title="Add Activity">+</button>
+                        <button class="section-action-btn" onclick="event.stopPropagation();openEditSectionModal('${sl.id}','${sec.id}')" title="Edit">✎</button>
+                        <button class="section-action-btn delete" onclick="event.stopPropagation();deleteSection('${sl.id}','${sec.id}')" title="Delete">✕</button>
+                    </div>
+                </div>
+                <div class="section-chart" style="grid-template-columns: ${stageCols};">${chartBgs}</div>
+            </div>
+            <div class="activity-rows ${sec.collapsed ? 'collapsed' : ''}" data-section-id="${sec.id}" data-swimlane-id="${sl.id}" style="max-height: ${sec.collapsed ? 0 : Math.max(actCount * 60 + 100, 60)}px;">
+                ${activitiesHtml}
+            </div>
+        </div>
+    `;
+}
+
+function renderActivityRow(sl, sec, act, stageCols) {
+    const stageCount = ganttData.stages.length;
+    const slColor = sl.color || '#58a6ff';
+    const isSharedActivity = act.isShared && act.sharedWith && act.sharedWith.length > 0;
+    const sharedLabel = isSharedActivity ? act.sharedWith.map(s => s.toUpperCase().substring(0, 2)).join('+') : '';
+    
+    let stageBgs = '';
+    const stageWidth = 100 / stageCount;
+    for (let i = 0; i < stageCount; i++) {
+        stageBgs += `<div class="stage-bg" style="left:${i * stageWidth}%;width:${stageWidth}%;${i === stageCount - 1 ? 'border-right:none;' : ''}"></div>`;
+    }
+    
+    // Use purple for shared activities, otherwise use swimlane color
+    const barColor = isSharedActivity ? '#a371f7' : slColor;
+    const barBg = isSharedActivity ? 'rgba(163, 113, 247, 0.25)' : hexToRgba(slColor, 0.25);
+    const barBorder = isSharedActivity ? 'rgba(163, 113, 247, 0.6)' : hexToRgba(slColor, 0.6);
+    
+    let barHtml;
+    if (act.isGate) {
+        barHtml = `<div class="bar exit-gate" style="left:calc(${act.start}% - 11px);" data-swimlane="${sl.id}" data-section="${sec.id}" data-activity="${act.id}"><span class="gate-label">G</span></div>`;
+    } else {
+        const width = act.end - act.start;
+        let indicators = '';
+        if (act.isDeliverable) indicators += '<div class="bar-indicator deliverable">D</div>';
+        const actPreds = (Array.isArray(act.predecessors) && act.predecessors.length > 0) || act.predecessor;
+        if (actPreds || getSuccessors(act.id).length > 0) indicators += '<div class="bar-indicator dependency">⇆</div>';
+        if (hasFriction(act)) indicators += '<div class="bar-indicator friction">⚠</div>';
+        if (hasNotes(act)) indicators += '<div class="bar-indicator notes">📝</div>';
+        barHtml = `<div class="bar" style="left:${act.start}%;width:${width}%;background:${barBg};border:1.5px solid ${barBorder};color:${barColor};" data-swimlane="${sl.id}" data-section="${sec.id}" data-activity="${act.id}"><div class="resize-handle left" data-handle="left"></div><div class="resize-handle right" data-handle="right"></div>${indicators ? `<div class="bar-indicators">${indicators}</div>` : ''}</div>`;
+    }
+    
+    return `
+        <div class="activity-row" draggable="true" data-activity-id="${act.id}" data-section-id="${sec.id}" data-swimlane-id="${sl.id}" style="grid-template-columns: ${ACTIVITY_COL_WIDTH}px 1fr;">
+            <div class="activity-label">
+                <span class="activity-drag-handle">⋮⋮</span>
+                <div class="activity-name" onclick="openSlidePanel('${sl.id}','${sec.id}','${act.id}')">${act.name}</div>
+                <div class="activity-badges">
+                    <div class="badge gate ${act.isGate ? '' : 'inactive'}" onclick="toggleGateProp('${sl.id}','${sec.id}','${act.id}')" title="Exit Gate">G</div>
+                    <div class="badge deliverable ${act.isDeliverable ? '' : 'inactive'}" onclick="toggleDeliverableProp('${sl.id}','${sec.id}','${act.id}')" title="Deliverable">D</div>
+                    ${isSharedActivity ? `<div class="badge shared-badge">${sharedLabel || 'S'}</div>` : ''}
+                </div>
+                <div class="activity-actions">
+                    <button class="action-btn" onclick="openSlidePanel('${sl.id}','${sec.id}','${act.id}')" title="Edit">✎</button>
+                    <button class="action-btn delete" onclick="deleteActivity('${sl.id}','${sec.id}','${act.id}')" title="Delete">✕</button>
+                </div>
+            </div>
+            <div class="activity-chart" data-activity-id="${act.id}">${stageBgs}${barHtml}</div>
+        </div>
+    `;
+}
+
+function hexToRgba(hex, alpha) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function toggleSectionCollapse(slId, secId) {
+    const sl = ganttData.swimlanes.find(s => s.id === slId);
+    if (!sl) return;
+    const sec = sl.sections.find(s => s.id === secId);
+    if (!sec) return;
+    sec.collapsed = !sec.collapsed;
+    render();
+}
+
+function attachReorderListeners() {
+    document.querySelectorAll('.section-drag-handle[draggable="true"]').forEach(el => {
+        el.addEventListener('dragstart', e => {
+            e.stopPropagation();
+            draggedSection = { swimlaneId: el.dataset.swimlaneId, sectionId: el.dataset.sectionId };
+            el.closest('.section-header').classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        });
+        el.addEventListener('dragend', e => {
+            el.closest('.section-header').classList.remove('dragging');
+            document.querySelectorAll('.section-header').forEach(x => x.classList.remove('drag-over'));
+            draggedSection = null;
+        });
+    });
+    document.querySelectorAll('.section-header').forEach(el => {
+        el.addEventListener('dragover', e => {
+            e.preventDefault();
+            if (!draggedSection || el.dataset.swimlaneId !== draggedSection.swimlaneId || el.dataset.sectionId === draggedSection.sectionId) return;
+            el.classList.add('drag-over');
+        });
+        el.addEventListener('dragleave', e => el.classList.remove('drag-over'));
+        el.addEventListener('drop', e => {
+            e.preventDefault();
+            if (!draggedSection) return;
+            const tsl = el.dataset.swimlaneId, tsec = el.dataset.sectionId;
+            if (tsl !== draggedSection.swimlaneId || tsec === draggedSection.sectionId) return;
+            const sl = ganttData.swimlanes.find(s => s.id === tsl);
+            if (!sl) return;
+            const fi = sl.sections.findIndex(s => s.id === draggedSection.sectionId);
+            const ti = sl.sections.findIndex(s => s.id === tsec);
+            if (fi === -1 || ti === -1) return;
+            const [rem] = sl.sections.splice(fi, 1);
+            sl.sections.splice(ti, 0, rem);
+            render();
+        });
+    });
+    
+    // Activity drag and drop
+    document.querySelectorAll('.activity-row[draggable="true"]').forEach(el => {
+        el.addEventListener('dragstart', e => {
+            draggedActivity = { swimlaneId: el.dataset.swimlaneId, sectionId: el.dataset.sectionId, activityId: el.dataset.activityId };
+            el.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        });
+        el.addEventListener('dragend', e => {
+            el.classList.remove('dragging');
+            document.querySelectorAll('.activity-row').forEach(x => x.classList.remove('drag-over'));
+            document.querySelectorAll('.empty-lane').forEach(x => x.classList.remove('drag-over'));
+            draggedActivity = null;
+        });
+        el.addEventListener('dragover', e => {
+            e.preventDefault();
+            if (!draggedActivity || el.dataset.swimlaneId !== draggedActivity.swimlaneId || el.dataset.activityId === draggedActivity.activityId) return;
+            el.classList.add('drag-over');
+        });
+        el.addEventListener('dragleave', e => el.classList.remove('drag-over'));
+        el.addEventListener('drop', e => {
+            e.preventDefault();
+            if (!draggedActivity) return;
+            const tsl = el.dataset.swimlaneId, tsec = el.dataset.sectionId, tact = el.dataset.activityId;
+            if (tsl !== draggedActivity.swimlaneId || tact === draggedActivity.activityId) return;
+            const sl = ganttData.swimlanes.find(s => s.id === tsl);
+            if (!sl) return;
+            let moved = null;
+            for (const sec of sl.sections) {
+                const idx = sec.activities.findIndex(a => a.id === draggedActivity.activityId);
+                if (idx !== -1) { [moved] = sec.activities.splice(idx, 1); break; }
+            }
+            if (!moved) return;
+            const tsecObj = sl.sections.find(s => s.id === tsec);
+            if (!tsecObj) return;
+            const ti = tsecObj.activities.findIndex(a => a.id === tact);
+            ti === -1 ? tsecObj.activities.push(moved) : tsecObj.activities.splice(ti, 0, moved);
+            render();
+        });
+    });
+    
+    // Empty lane drop targets for empty sections
+    document.querySelectorAll('.empty-lane[data-section-id]').forEach(el => {
+        el.addEventListener('dragover', e => {
+            e.preventDefault();
+            if (!draggedActivity || el.dataset.swimlaneId !== draggedActivity.swimlaneId) return;
+            el.classList.add('drag-over');
+        });
+        el.addEventListener('dragleave', e => el.classList.remove('drag-over'));
+        el.addEventListener('drop', e => {
+            e.preventDefault();
+            el.classList.remove('drag-over');
+            if (!draggedActivity) return;
+            const tsl = el.dataset.swimlaneId, tsec = el.dataset.sectionId;
+            if (tsl !== draggedActivity.swimlaneId) return;
+            const sl = ganttData.swimlanes.find(s => s.id === tsl);
+            if (!sl) return;
+            let moved = null;
+            for (const sec of sl.sections) {
+                const idx = sec.activities.findIndex(a => a.id === draggedActivity.activityId);
+                if (idx !== -1) { [moved] = sec.activities.splice(idx, 1); break; }
+            }
+            if (!moved) return;
+            const tsecObj = sl.sections.find(s => s.id === tsec);
+            if (!tsecObj) return;
+            tsecObj.activities.push(moved);
+            render();
+        });
+    });
+}
+
+function attachTooltipListeners() {
+    document.querySelectorAll('.bar').forEach(bar => {
+        bar.addEventListener('mouseenter', showTooltip);
+        bar.addEventListener('mouseleave', hideTooltip);
+    });
+}
+
+function showTooltip(e) {
+    const bar = e.currentTarget, actId = bar.dataset.activity, result = findActivityById(actId);
+    if (!result) return;
+    const { activity: act, section: sec, swimlane: sl } = result;
+    const predIds = (Array.isArray(act.predecessors) && act.predecessors.length > 0) ? act.predecessors : (act.predecessor ? [act.predecessor] : []);
+    const predInfos = predIds.map(pid => findActivityById(pid)).filter(p => p);
+    const succs = getSuccessors(actId);
+    const stageIdx = Math.floor(act.start / getStageWidth());
+    const stageName = ganttData.stages[Math.min(stageIdx, ganttData.stages.length - 1)]?.name || '';
+    
+    // Highlight predecessors and successors
+    highlightDependencies(actId, predIds, succs.map(s => s.activity.id));
+    
+    let html = `<div class="tooltip-title">${act.name}</div>`;
+    html += `<div class="tooltip-row"><span class="tooltip-label">Owner:</span><span class="tooltip-value">${sl.name}</span></div>`;
+    html += `<div class="tooltip-row"><span class="tooltip-label">Section:</span><span class="tooltip-value">${sec.name}</span></div>`;
+    if (act.isGate) {
+        const gateStageIdx = getStageEnds().findIndex(end => Math.abs(end - act.start) < 1);
+        const gateStage = ganttData.stages[gateStageIdx >= 0 ? gateStageIdx : ganttData.stages.length - 1];
+        html += `<div class="tooltip-row"><span class="tooltip-label">Type:</span><span class="tooltip-value" style="color:var(--gate-color);">Exit Gate (${gateStage?.name || 'End'})</span></div>`;
+    } else {
+        html += `<div class="tooltip-row"><span class="tooltip-label">Range:</span><span class="tooltip-value">${act.start}% - ${act.end}%</span></div>`;
+    }
+    if (act.isDeliverable) html += `<div class="tooltip-row"><span class="tooltip-label">Deliverable:</span><span class="tooltip-value" style="color:var(--deliverable-color);">Yes</span></div>`;
+    if (act.isShared && act.sharedWith.length) html += `<div class="tooltip-row"><span class="tooltip-label">Shared:</span><span class="tooltip-value" style="color:var(--shared-color);">${act.sharedWith.map(s => s.toUpperCase()).join(', ')}</span></div>`;
+    if (predInfos.length) html += `<div class="tooltip-row"><span class="tooltip-label">Predecessor${predInfos.length > 1 ? 's' : ''}:</span><span class="tooltip-value predecessor">← ${predInfos.map(p => p.activity.name).join(', ')}</span></div>`;
+    if (succs.length) html += `<div class="tooltip-row"><span class="tooltip-label">Successor${succs.length > 1 ? 's' : ''}:</span><span class="tooltip-value successor">→ ${succs.map(s => s.activity.name).join(', ')}</span></div>`;
+    if (act.friction?.trim()) html += `<div class="tooltip-section"><div class="tooltip-section-title">⚠ Friction</div><div class="tooltip-text">${act.friction}</div></div>`;
+    if (act.resolution?.trim()) html += `<div class="tooltip-section"><div class="tooltip-section-title">Resolution</div><div class="tooltip-text">${act.resolution}</div></div>`;
+    if (act.deliverableDetails?.trim()) html += `<div class="tooltip-section"><div class="tooltip-section-title">📄 Deliverable</div><div class="tooltip-text">${act.deliverableDetails}</div></div>`;
+    if (act.notes?.trim()) html += `<div class="tooltip-section"><div class="tooltip-section-title">📝 Notes</div><div class="tooltip-text">${act.notes}</div></div>`;
+    tooltip.innerHTML = html;
+    tooltip.classList.add('visible');
+    
+    // Position tooltip at top right of bar
+    positionTooltipAtBar(bar);
+}
+
+function positionTooltipAtBar(bar) {
+    const barRect = bar.getBoundingClientRect();
+    const tooltipRect = tooltip.getBoundingClientRect();
+    
+    // Position bottom left of tooltip aligned with bottom right of bar
+    let x = barRect.right + 8;
+    let y = barRect.bottom - tooltipRect.height;
+    
+    // Adjust if tooltip goes off right edge
+    if (x + tooltipRect.width > window.innerWidth - 16) {
+        x = barRect.left - tooltipRect.width - 8;
+    }
+    
+    // Adjust if tooltip goes off top
+    if (y < 16) {
+        y = 16;
+    }
+    
+    // Adjust if tooltip goes off bottom
+    if (y + tooltipRect.height > window.innerHeight - 16) {
+        y = window.innerHeight - tooltipRect.height - 16;
+    }
+    
+    tooltip.style.left = x + 'px';
+    tooltip.style.top = y + 'px';
+}
+
+function highlightDependencies(currentId, predecessorIds, successorIds) {
+    // Clear any existing highlights first
+    clearDependencyHighlights();
+    
+    // Highlight predecessors
+    const predArray = Array.isArray(predecessorIds) ? predecessorIds : (predecessorIds ? [predecessorIds] : []);
+    predArray.forEach(predecessorId => {
+        const predBar = document.querySelector(`.bar[data-activity="${predecessorId}"]`);
+        if (predBar) {
+            predBar.classList.add('highlight-predecessor');
+        }
+        const predRow = document.querySelector(`.activity-row[data-activity-id="${predecessorId}"]`);
+        if (predRow) {
+            predRow.classList.add('highlight-predecessor-row');
+        }
+    });
+    
+    // Highlight successors
+    successorIds.forEach(succId => {
+        const succBar = document.querySelector(`.bar[data-activity="${succId}"]`);
+        if (succBar) {
+            succBar.classList.add('highlight-successor');
+        }
+        const succRow = document.querySelector(`.activity-row[data-activity-id="${succId}"]`);
+        if (succRow) {
+            succRow.classList.add('highlight-successor-row');
+        }
+    });
+}
+
+function clearDependencyHighlights() {
+    document.querySelectorAll('.highlight-predecessor, .highlight-successor').forEach(el => {
+        el.classList.remove('highlight-predecessor', 'highlight-successor');
+    });
+    document.querySelectorAll('.highlight-predecessor-row, .highlight-successor-row').forEach(el => {
+        el.classList.remove('highlight-predecessor-row', 'highlight-successor-row');
+    });
+}
+
+function hideTooltip() { 
+    tooltip.classList.remove('visible'); 
+    clearDependencyHighlights();
+}
+
+function attachDragListeners() {
+    document.querySelectorAll('.bar').forEach(bar => bar.addEventListener('mousedown', startBarDrag));
+}
+
+function startBarDrag(e) {
+    if (e.target.classList.contains('resize-handle')) { startResize(e); return; }
+    const bar = e.currentTarget, actId = bar.dataset.activity, chart = bar.parentElement, chartRect = chart.getBoundingClientRect();
+    const result = findActivityById(actId);
+    if (!result) return;
+    dragState = {
+        type: result.activity.isGate ? 'gate-move' : 'move',
+        bar, activityId: actId, activity: result.activity, chartRect,
+        startX: e.clientX, originalStart: result.activity.start, originalEnd: result.activity.end
+    };
+    bar.classList.add('dragging');
+    hideTooltip();
+    document.addEventListener('mousemove', onBarDrag);
+    document.addEventListener('mouseup', endBarDrag);
+    e.preventDefault();
+}
+
+function startResize(e) {
+    const handle = e.target, bar = handle.parentElement, actId = bar.dataset.activity, chart = bar.parentElement, chartRect = chart.getBoundingClientRect();
+    const result = findActivityById(actId);
+    if (!result || result.activity.isGate) return;
+    dragState = {
+        type: 'resize', handle: handle.dataset.handle,
+        bar, activityId: actId, activity: result.activity, chartRect,
+        startX: e.clientX, originalStart: result.activity.start, originalEnd: result.activity.end
+    };
+    bar.classList.add('dragging');
+    hideTooltip();
+    document.addEventListener('mousemove', onBarDrag);
+    document.addEventListener('mouseup', endBarDrag);
+    e.preventDefault();
+}
+
+function onBarDrag(e) {
+    if (!dragState) return;
+    const deltaX = e.clientX - dragState.startX;
+    const deltaPercent = (deltaX / dragState.chartRect.width) * 100;
+    
+    if (dragState.type === 'gate-move') {
+        let newPos = Math.max(0, Math.min(100, dragState.originalStart + deltaPercent));
+        const snapped = snapToStageEnd(newPos);
+        dragState.activity.start = snapped;
+        dragState.activity.end = snapped;
+        dragState.bar.style.left = `calc(${snapped}% - 11px)`;
+    } else if (dragState.type === 'move') {
+        let newStart = dragState.originalStart + deltaPercent;
+        let newEnd = dragState.originalEnd + deltaPercent;
+        const width = newEnd - newStart;
+        if (newStart < 0) { newStart = 0; newEnd = width; }
+        if (newEnd > 100) { newEnd = 100; newStart = 100 - width; }
+        dragState.activity.start = Math.round(newStart);
+        dragState.activity.end = Math.round(newEnd);
+        dragState.bar.style.left = `${newStart}%`;
+    } else if (dragState.type === 'resize') {
+        if (dragState.handle === 'left') {
+            let newStart = Math.max(0, Math.min(dragState.originalStart + deltaPercent, dragState.originalEnd - 5));
+            dragState.activity.start = Math.round(newStart);
+            dragState.bar.style.left = `${newStart}%`;
+            dragState.bar.style.width = `${dragState.activity.end - newStart}%`;
+        } else {
+            let newEnd = Math.max(dragState.originalStart + 5, Math.min(dragState.originalEnd + deltaPercent, 100));
+            dragState.activity.end = Math.round(newEnd);
+            dragState.bar.style.width = `${newEnd - dragState.activity.start}%`;
+        }
+    }
+}
+
+function endBarDrag() {
+    if (dragState?.bar) dragState.bar.classList.remove('dragging');
+    dragState = null;
+    document.removeEventListener('mousemove', onBarDrag);
+    document.removeEventListener('mouseup', endBarDrag);
+}
+
+function getActivity(slId, secId, actId) {
+    const sl = ganttData.swimlanes.find(s => s.id === slId);
+    if (!sl) return null;
+    const sec = sl.sections.find(s => s.id === secId);
+    if (!sec) return null;
+    return sec.activities.find(a => a.id === actId);
+}
+
+function toggleGateProp(slId, secId, actId) {
+    const act = getActivity(slId, secId, actId);
+    if (act) {
+        act.isGate = !act.isGate;
+        if (act.isGate) {
+            const snapped = snapToStageEnd(act.end);
+            act.start = snapped;
+            act.end = snapped;
+        }
+        render();
+    }
+}
+
+function toggleDeliverableProp(slId, secId, actId) {
+    const act = getActivity(slId, secId, actId);
+    if (act) { act.isDeliverable = !act.isDeliverable; render(); }
+}
+
+function deleteActivity(slId, secId, actId) {
+    if (!confirm('Delete this activity?')) return;
+    const sl = ganttData.swimlanes.find(s => s.id === slId);
+    if (!sl) return;
+    const sec = sl.sections.find(s => s.id === secId);
+    if (!sec) return;
+    ganttData.swimlanes.forEach(s => s.sections.forEach(sc => sc.activities.forEach(a => { if (a.predecessor === actId) a.predecessor = null; })));
+    sec.activities = sec.activities.filter(a => a.id !== actId);
+    render();
+}
+
+function deleteSection(slId, secId) {
+    if (!confirm('Delete section and all activities?')) return;
+    const sl = ganttData.swimlanes.find(s => s.id === slId);
+    if (!sl) return;
+    const sec = sl.sections.find(s => s.id === secId);
+    if (sec) {
+        const actIds = sec.activities.map(a => a.id);
+        ganttData.swimlanes.forEach(s => s.sections.forEach(sc => sc.activities.forEach(a => { if (actIds.includes(a.predecessor)) a.predecessor = null; })));
+    }
+    sl.sections = sl.sections.filter(s => s.id !== secId);
+    render();
+}
+
+function getAllActivities() {
+    const all = [];
+    ganttData.swimlanes.forEach(sl => sl.sections.forEach(sec => sec.activities.forEach(act => all.push({ ...act, sectionId: sec.id, sectionName: sec.name, swimlaneId: sl.id, swimlaneName: sl.name }))));
+    return all;
+}
+
+let allActivitiesCache = [];
+let currentExcludeId = null;
+let selectedPredecessors = [];
+let selectedSuccessors = [];
+
+function buildActivityCache(excludeId = null) {
+    currentExcludeId = excludeId;
+    allActivitiesCache = getAllActivities().filter(act => act.id !== excludeId);
+}
+
+function filterPredecessorList() {
+    const search = document.getElementById('activity-predecessor-search').value.toLowerCase();
+    const dropdown = document.getElementById('predecessor-dropdown');
+    renderActivityDropdown(dropdown, search, 'predecessor');
+}
+
+function filterSuccessorList() {
+    const search = document.getElementById('activity-successor-search').value.toLowerCase();
+    const dropdown = document.getElementById('successor-dropdown');
+    renderActivityDropdown(dropdown, search, 'successor');
+}
+
+function renderActivityDropdown(dropdown, search, type) {
+    const selectedIds = type === 'predecessor' ? selectedPredecessors : selectedSuccessors;
+    const filtered = allActivitiesCache.filter(act => 
+        !selectedIds.includes(act.id) &&
+        (act.name.toLowerCase().includes(search) || 
+        act.swimlaneName.toLowerCase().includes(search) ||
+        act.sectionName.toLowerCase().includes(search))
+    );
+    
+    let html = '';
+    
+    filtered.slice(0, 20).forEach(act => {
+        html += `<div class="searchable-dropdown-item" onclick="addSelectedActivity('${act.id}', '${type}')">
+            <div class="item-name">${act.name}</div>
+            <div class="item-meta">${act.swimlaneName} / ${act.sectionName}</div>
+        </div>`;
+    });
+    
+    if (filtered.length > 20) {
+        html += `<div class="searchable-dropdown-item none-option">... ${filtered.length - 20} more results</div>`;
+    }
+    
+    if (filtered.length === 0 && search) {
+        html += `<div class="searchable-dropdown-item none-option">No matching activities</div>`;
+    }
+    
+    if (filtered.length === 0 && !search) {
+        html += `<div class="searchable-dropdown-item none-option">No activities available</div>`;
+    }
+    
+    dropdown.innerHTML = html;
+}
+
+function showPredecessorDropdown() {
+    const dropdown = document.getElementById('predecessor-dropdown');
+    dropdown.classList.add('visible');
+    filterPredecessorList();
+    
+    setTimeout(() => {
+        document.addEventListener('click', closePredecessorDropdownOnOutsideClick);
+    }, 0);
+}
+
+function showSuccessorDropdown() {
+    const dropdown = document.getElementById('successor-dropdown');
+    dropdown.classList.add('visible');
+    filterSuccessorList();
+    
+    setTimeout(() => {
+        document.addEventListener('click', closeSuccessorDropdownOnOutsideClick);
+    }, 0);
+}
+
+function closePredecessorDropdownOnOutsideClick(e) {
+    const container = document.querySelector('#activity-predecessor-search').closest('.searchable-select');
+    if (!container.contains(e.target)) {
+        document.getElementById('predecessor-dropdown').classList.remove('visible');
+        document.removeEventListener('click', closePredecessorDropdownOnOutsideClick);
+    }
+}
+
+function closeSuccessorDropdownOnOutsideClick(e) {
+    const container = document.querySelector('#activity-successor-search').closest('.searchable-select');
+    if (!container.contains(e.target)) {
+        document.getElementById('successor-dropdown').classList.remove('visible');
+        document.removeEventListener('click', closeSuccessorDropdownOnOutsideClick);
+    }
+}
+
+function addSelectedActivity(actId, type) {
+    if (type === 'predecessor') {
+        if (!selectedPredecessors.includes(actId)) {
+            selectedPredecessors.push(actId);
+        }
+        document.getElementById('activity-predecessor-search').value = '';
+        document.getElementById('predecessor-dropdown').classList.remove('visible');
+        renderSelectedPredecessors();
+    } else {
+        if (!selectedSuccessors.includes(actId)) {
+            selectedSuccessors.push(actId);
+        }
+        document.getElementById('activity-successor-search').value = '';
+        document.getElementById('successor-dropdown').classList.remove('visible');
+        renderSelectedSuccessors();
+    }
+}
+
+function renderSelectedPredecessors() {
+    const container = document.getElementById('selected-predecessors');
+    if (selectedPredecessors.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+    container.innerHTML = selectedPredecessors.map(actId => {
+        const act = allActivitiesCache.find(a => a.id === actId);
+        if (!act) return '';
+        return `<div class="selected-tag">
+            <span class="tag-name">${act.name}</span>
+            <span class="tag-remove" onclick="removePredecessor('${actId}')">×</span>
+        </div>`;
+    }).join('');
+}
+
+function renderSelectedSuccessors() {
+    const container = document.getElementById('selected-successors');
+    if (selectedSuccessors.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+    container.innerHTML = selectedSuccessors.map(actId => {
+        const act = allActivitiesCache.find(a => a.id === actId);
+        if (!act) return '';
+        return `<div class="selected-tag">
+            <span class="tag-name">${act.name}</span>
+            <span class="tag-remove" onclick="removeSuccessor('${actId}')">×</span>
+        </div>`;
+    }).join('');
+}
+
+function removePredecessor(actId) {
+    selectedPredecessors = selectedPredecessors.filter(id => id !== actId);
+    renderSelectedPredecessors();
+}
+
+function removeSuccessor(actId) {
+    selectedSuccessors = selectedSuccessors.filter(id => id !== actId);
+    renderSelectedSuccessors();
+}
+
+function clearPredecessors() {
+    selectedPredecessors = [];
+    renderSelectedPredecessors();
+}
+
+function clearSuccessors() {
+    selectedSuccessors = [];
+    renderSelectedSuccessors();
+}
+
+function toggleSharedWith() { document.getElementById('shared-with-section').classList.toggle('hidden', !document.getElementById('activity-shared').checked); }
+
+function populateSharedWithCheckboxes(currentSwimlaneId) {
+    const container = document.getElementById('shared-with-checkboxes');
+    const otherSwimlanes = ganttData.swimlanes.filter(sl => sl.id !== currentSwimlaneId);
+    container.innerHTML = otherSwimlanes.map(sl => 
+        `<label class="checkbox-item"><input type="checkbox" id="shared-${sl.id}" data-swimlane-id="${sl.id}"><span>${sl.name}</span></label>`
+    ).join('');
+}
+
+function getSelectedSharedWith() {
+    const checkboxes = document.querySelectorAll('#shared-with-checkboxes input[type="checkbox"]:checked');
+    return Array.from(checkboxes).map(cb => cb.dataset.swimlaneId);
+}
+
+function setSharedWithCheckboxes(sharedWithIds) {
+    document.querySelectorAll('#shared-with-checkboxes input[type="checkbox"]').forEach(cb => {
+        cb.checked = sharedWithIds.includes(cb.dataset.swimlaneId);
+    });
+}
+function toggleGateNote() { document.getElementById('gate-note').style.display = document.getElementById('activity-gate').checked ? 'block' : 'none'; }
+
+// Swimlane management
+let editingSwimlaneId = null;
+let selectedSwimlaneColor = null;
+
+function toggleSwimlaneCollapse(slId) {
+    const sl = ganttData.swimlanes.find(s => s.id === slId);
+    if (sl) {
+        sl.collapsed = !sl.collapsed;
+        render();
+    }
+}
+
+function renderSwimlaneColorPicker() {
+    const container = document.getElementById('swimlane-color-picker');
+    container.innerHTML = STAGE_COLORS.map(color => `
+        <div class="color-option ${selectedSwimlaneColor === color ? 'selected' : ''}" 
+             style="background:${color};" 
+             onclick="selectSwimlaneColor('${color}')"></div>
+    `).join('');
+}
+
+function selectSwimlaneColor(color) {
+    selectedSwimlaneColor = color;
+    renderSwimlaneColorPicker();
+}
+
+function openAddSwimlaneModal() {
+    editingSwimlaneId = null;
+    document.getElementById('swimlane-modal-title').textContent = 'Add Swimlane';
+    document.getElementById('swimlane-name').value = '';
+    selectedSwimlaneColor = STAGE_COLORS[0];
+    renderSwimlaneColorPicker();
+    document.getElementById('swimlane-modal').classList.add('visible');
+}
+
+function openEditSwimlaneModal(slId) {
+    editingSwimlaneId = slId;
+    const sl = ganttData.swimlanes.find(s => s.id === slId);
+    if (!sl) return;
+    document.getElementById('swimlane-modal-title').textContent = 'Edit Swimlane';
+    document.getElementById('swimlane-name').value = sl.name;
+    selectedSwimlaneColor = sl.color || STAGE_COLORS[0];
+    renderSwimlaneColorPicker();
+    document.getElementById('swimlane-modal').classList.add('visible');
+}
+
+function closeSwimlaneModal() {
+    document.getElementById('swimlane-modal').classList.remove('visible');
+    editingSwimlaneId = null;
+}
+
+function confirmSwimlane() {
+    const name = document.getElementById('swimlane-name').value || 'New Swimlane';
+    
+    if (editingSwimlaneId) {
+        const sl = ganttData.swimlanes.find(s => s.id === editingSwimlaneId);
+        if (sl) {
+            sl.name = name;
+            sl.color = selectedSwimlaneColor;
+        }
+    } else {
+        const newId = `sl_${Date.now()}`;
+        ganttData.swimlanes.push({
+            id: newId,
+            name: name,
+            color: selectedSwimlaneColor,
+            collapsed: false,
+            sections: [{ id: `${newId}_sec_1`, name: 'General', collapsed: false, activities: [] }]
+        });
+    }
+    closeSwimlaneModal();
+    render();
+}
+
+function deleteSwimlane(slId) {
+    if (ganttData.swimlanes.length <= 1) return;
+    const sl = ganttData.swimlanes.find(s => s.id === slId);
+    const actCount = sl ? sl.sections.reduce((sum, sec) => sum + sec.activities.length, 0) : 0;
+    const msg = actCount > 0 
+        ? `Delete "${sl.name}" and all ${actCount} activities inside?` 
+        : `Delete "${sl.name}"?`;
+    if (!confirm(msg)) return;
+    
+    // Clear predecessor references to activities in this swimlane
+    const actIds = [];
+    sl.sections.forEach(sec => sec.activities.forEach(a => actIds.push(a.id)));
+    ganttData.swimlanes.forEach(s => s.sections.forEach(sec => sec.activities.forEach(a => {
+        if (actIds.includes(a.predecessor)) a.predecessor = null;
+    })));
+    
+    ganttData.swimlanes = ganttData.swimlanes.filter(s => s.id !== slId);
+    render();
+}
+
+// Section Modal
+function openSectionModal(slId) {
+    currentSwimlane = slId; editSectionMode = false; currentEditSection = null;
+    document.getElementById('section-modal-title').textContent = 'Add Section';
+    document.getElementById('section-name').value = '';
+    document.getElementById('section-modal').classList.add('visible');
+}
+
+function openEditSectionModal(slId, secId) {
+    currentSwimlane = slId; editSectionMode = true; currentEditSection = secId;
+    const sl = ganttData.swimlanes.find(s => s.id === slId);
+    const sec = sl?.sections.find(s => s.id === secId);
+    if (!sec) return;
+    document.getElementById('section-modal-title').textContent = 'Edit Section';
+    document.getElementById('section-name').value = sec.name;
+    document.getElementById('section-modal').classList.add('visible');
+}
+
+function closeSectionModal() { document.getElementById('section-modal').classList.remove('visible'); }
+
+function confirmSection() {
+    const name = document.getElementById('section-name').value || 'New Section';
+    const sl = ganttData.swimlanes.find(s => s.id === currentSwimlane);
+    if (!sl) return;
+    if (editSectionMode && currentEditSection) {
+        const sec = sl.sections.find(s => s.id === currentEditSection);
+        if (sec) sec.name = name;
+    } else {
+        sl.sections.push({ id: `${currentSwimlane}_sec_${Date.now()}`, name, collapsed: false, activities: [] });
+    }
+    closeSectionModal();
+    render();
+}
+
+// Activity Modal
+function openAddActivityModal(slId) {
+    currentSwimlane = slId; currentSection = null; currentActivity = null; editMode = false;
+    const sl = ganttData.swimlanes.find(s => s.id === slId);
+    if (sl?.sections.length) currentSection = sl.sections[0].id;
+    document.getElementById('modal-title').textContent = 'Add Activity';
+    document.getElementById('modal-confirm-btn').textContent = 'Add';
+    document.getElementById('activity-name').value = '';
+    document.getElementById('activity-gate').checked = false;
+    document.getElementById('activity-deliverable').checked = false;
+    document.getElementById('activity-shared').checked = false;
+    populateSharedWithCheckboxes(slId);
+    document.getElementById('shared-with-section').classList.add('hidden');
+    document.getElementById('gate-note').style.display = 'none';
+    document.getElementById('activity-friction').value = '';
+    document.getElementById('activity-resolution').value = '';
+    document.getElementById('activity-deliverable-details').value = '';
+    document.getElementById('activity-notes').value = '';
+    
+    // Multi-select predecessor/successor
+    buildActivityCache(null);
+    selectedPredecessors = [];
+    selectedSuccessors = [];
+    document.getElementById('activity-predecessor-search').value = '';
+    document.getElementById('activity-successor-search').value = '';
+    renderSelectedPredecessors();
+    renderSelectedSuccessors();
+    
+    document.getElementById('activity-modal').classList.add('visible');
+}
+
+function openAddActivityToSectionModal(slId, secId) {
+    currentSwimlane = slId; currentSection = secId; currentActivity = null; editMode = false;
+    document.getElementById('modal-title').textContent = 'Add Activity';
+    document.getElementById('modal-confirm-btn').textContent = 'Add';
+    document.getElementById('activity-name').value = '';
+    document.getElementById('activity-gate').checked = false;
+    document.getElementById('activity-deliverable').checked = false;
+    document.getElementById('activity-shared').checked = false;
+    populateSharedWithCheckboxes(slId);
+    document.getElementById('shared-with-section').classList.add('hidden');
+    document.getElementById('gate-note').style.display = 'none';
+    document.getElementById('activity-friction').value = '';
+    document.getElementById('activity-resolution').value = '';
+    document.getElementById('activity-deliverable-details').value = '';
+    document.getElementById('activity-notes').value = '';
+    
+    // Multi-select predecessor/successor
+    buildActivityCache(null);
+    selectedPredecessors = [];
+    selectedSuccessors = [];
+    document.getElementById('activity-predecessor-search').value = '';
+    document.getElementById('activity-successor-search').value = '';
+    renderSelectedPredecessors();
+    renderSelectedSuccessors();
+    
+    document.getElementById('activity-modal').classList.add('visible');
+}
+
+function openEditActivityModal(slId, secId, actId) {
+    currentSwimlane = slId; currentSection = secId; currentActivity = actId; editMode = true;
+    const act = getActivity(slId, secId, actId);
+    if (!act) return;
+    document.getElementById('modal-title').textContent = 'Edit Activity';
+    document.getElementById('modal-confirm-btn').textContent = 'Save';
+    document.getElementById('activity-name').value = act.name;
+    document.getElementById('activity-gate').checked = act.isGate || false;
+    document.getElementById('activity-deliverable').checked = act.isDeliverable || false;
+    document.getElementById('activity-shared').checked = act.isShared || false;
+    document.getElementById('gate-note').style.display = act.isGate ? 'block' : 'none';
+    populateSharedWithCheckboxes(slId);
+    setSharedWithCheckboxes(act.sharedWith || []);
+    document.getElementById('shared-with-section').classList.toggle('hidden', !act.isShared);
+    document.getElementById('activity-friction').value = act.friction || '';
+    document.getElementById('activity-resolution').value = act.resolution || '';
+    document.getElementById('activity-deliverable-details').value = act.deliverableDetails || '';
+    document.getElementById('activity-notes').value = act.notes || '';
+    
+    // Multi-select predecessor/successor
+    buildActivityCache(actId);
+    
+    // Load predecessors (support both old single value and new array)
+    if (Array.isArray(act.predecessors)) {
+        selectedPredecessors = [...act.predecessors];
+    } else if (act.predecessor) {
+        selectedPredecessors = [act.predecessor];
+    } else {
+        selectedPredecessors = [];
+    }
+    document.getElementById('activity-predecessor-search').value = '';
+    renderSelectedPredecessors();
+    
+    // Find current successors (activities that have this activity as predecessor)
+    const successors = getSuccessors(actId);
+    selectedSuccessors = successors.map(s => s.activity.id);
+    document.getElementById('activity-successor-search').value = '';
+    renderSelectedSuccessors();
+    
+    document.getElementById('activity-modal').classList.add('visible');
+}
+
+function closeActivityModal() { document.getElementById('activity-modal').classList.remove('visible'); }
+
+// Slide Panel Functions
+let slidePanelActivity = null;
+let slidePredecessors = [];
+let slideSuccessors = [];
+
+function openSlidePanel(slId, secId, actId) {
+    // Auto-save previous activity if panel was already open
+    if (slidePanelActivity && slidePanelActivity.actId !== actId) {
+        saveSlidePanel(false); // Save without closing
+    }
+    
+    const act = getActivity(slId, secId, actId);
+    if (!act) return;
+    
+    slidePanelActivity = { slId, secId, actId };
+    
+    // Populate fields
+    document.getElementById('slide-panel-title').textContent = `Edit: ${act.name}`;
+    document.getElementById('slide-name').value = act.name;
+    document.getElementById('slide-gate').checked = act.isGate || false;
+    document.getElementById('slide-deliverable').checked = act.isDeliverable || false;
+    document.getElementById('slide-shared').checked = act.isShared || false;
+    document.getElementById('slide-friction').value = act.friction || '';
+    document.getElementById('slide-resolution').value = act.resolution || '';
+    document.getElementById('slide-deliverable-details').value = act.deliverableDetails || '';
+    document.getElementById('slide-notes').value = act.notes || '';
+    
+    // Populate shared with checkboxes
+    const otherSwimlanes = ganttData.swimlanes.filter(s => s.id !== slId);
+    const sharedWithContainer = document.getElementById('slide-shared-checkboxes');
+    sharedWithContainer.innerHTML = otherSwimlanes.map(s => {
+        const checked = (act.sharedWith || []).includes(s.id) ? 'checked' : '';
+        return `<label class="checkbox-item"><input type="checkbox" data-swimlane-id="${s.id}" ${checked}><span>${s.name}</span></label>`;
+    }).join('');
+    
+    document.getElementById('slide-shared-with-section').style.display = act.isShared ? '' : 'none';
+    
+    // Initialize predecessors
+    if (Array.isArray(act.predecessors) && act.predecessors.length > 0) {
+        slidePredecessors = [...act.predecessors];
+    } else if (act.predecessor) {
+        slidePredecessors = [act.predecessor];
+    } else {
+        slidePredecessors = [];
+    }
+    
+    // Initialize successors
+    const succs = getSuccessors(actId);
+    slideSuccessors = succs.map(s => s.activity.id);
+    
+    renderSlideSelectedPredecessors();
+    renderSlideSelectedSuccessors();
+    
+    // Set delete button
+    document.getElementById('slide-delete-btn').onclick = () => {
+        if (confirm('Delete this activity?')) {
+            deleteActivity(slId, secId, actId);
+            closeSlidePanel();
+        }
+    };
+    
+    // Open panel and shrink chart
+    document.body.classList.add('panel-open');
+    document.getElementById('slide-panel').classList.add('open');
+}
+
+function closeSlidePanel() {
+    document.body.classList.remove('panel-open');
+    const panel = document.getElementById('slide-panel');
+    panel.classList.remove('open');
+    // Reset panel width to default after transition
+    setTimeout(() => {
+        if (!panel.classList.contains('open')) {
+            document.documentElement.style.setProperty('--panel-width', '380px');
+            panel.style.width = '';
+        }
+    }, 300);
+    slidePanelActivity = null;
+    slidePredecessors = [];
+    slideSuccessors = [];
+}
+
+// Escape key to close panel without saving
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && slidePanelActivity) {
+        closeSlidePanel();
+    }
+});
+
+// Panel resize functionality
+(function() {
+    const panel = document.getElementById('slide-panel');
+    const resizeHandle = document.getElementById('slide-panel-resize');
+    let isResizing = false;
+    let startX, startWidth;
+    
+    resizeHandle.addEventListener('mousedown', function(e) {
+        isResizing = true;
+        startX = e.clientX;
+        startWidth = panel.offsetWidth;
+        resizeHandle.classList.add('resizing');
+        document.body.style.cursor = 'ew-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+    });
+    
+    document.addEventListener('mousemove', function(e) {
+        if (!isResizing) return;
+        const diff = startX - e.clientX;
+        const newWidth = Math.max(300, Math.min(800, startWidth + diff));
+        document.documentElement.style.setProperty('--panel-width', newWidth + 'px');
+        panel.style.width = newWidth + 'px';
+    });
+    
+    document.addEventListener('mouseup', function() {
+        if (isResizing) {
+            isResizing = false;
+            resizeHandle.classList.remove('resizing');
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        }
+    });
+})();
+
+function toggleSlideSharedWith() {
+    const isShared = document.getElementById('slide-shared').checked;
+    document.getElementById('slide-shared-with-section').style.display = isShared ? '' : 'none';
+}
+
+function saveSlidePanel(shouldClose = true) {
+    if (!slidePanelActivity) return;
+    
+    const { slId, secId, actId } = slidePanelActivity;
+    const act = getActivity(slId, secId, actId);
+    if (!act) return;
+    
+    // Save basic fields
+    act.name = document.getElementById('slide-name').value || 'Activity';
+    act.isGate = document.getElementById('slide-gate').checked;
+    act.isDeliverable = document.getElementById('slide-deliverable').checked;
+    act.isShared = document.getElementById('slide-shared').checked;
+    act.friction = document.getElementById('slide-friction').value || '';
+    act.resolution = document.getElementById('slide-resolution').value || '';
+    act.deliverableDetails = document.getElementById('slide-deliverable-details').value || '';
+    act.notes = document.getElementById('slide-notes').value || '';
+    
+    // Save shared with
+    if (act.isShared) {
+        const checkboxes = document.querySelectorAll('#slide-shared-checkboxes input[type="checkbox"]:checked');
+        act.sharedWith = Array.from(checkboxes).map(cb => cb.dataset.swimlaneId);
+    } else {
+        act.sharedWith = [];
+    }
+    
+    // Handle gate snapping
+    if (act.isGate) {
+        const snapped = snapToStageEnd(act.end);
+        act.start = snapped;
+        act.end = snapped;
+    }
+    
+    // Save predecessors
+    const oldPreds = Array.isArray(act.predecessors) ? [...act.predecessors] : (act.predecessor ? [act.predecessor] : []);
+    act.predecessors = [...slidePredecessors];
+    act.predecessor = slidePredecessors.length > 0 ? slidePredecessors[0] : null;
+    
+    // Save successors - update other activities
+    const oldSuccs = getSuccessors(actId).map(s => s.activity.id);
+    
+    // Remove this activity from old successors that are no longer selected
+    oldSuccs.forEach(oldSuccId => {
+        if (!slideSuccessors.includes(oldSuccId)) {
+            const result = findActivityById(oldSuccId);
+            if (result) {
+                if (Array.isArray(result.activity.predecessors)) {
+                    result.activity.predecessors = result.activity.predecessors.filter(p => p !== actId);
+                }
+                if (result.activity.predecessor === actId) {
+                    result.activity.predecessor = result.activity.predecessors?.[0] || null;
+                }
+            }
+        }
+    });
+    
+    // Add this activity as predecessor to new successors
+    slideSuccessors.forEach(succId => {
+        const result = findActivityById(succId);
+        if (result) {
+            if (!Array.isArray(result.activity.predecessors)) {
+                result.activity.predecessors = result.activity.predecessor ? [result.activity.predecessor] : [];
+            }
+            if (!result.activity.predecessors.includes(actId)) {
+                result.activity.predecessors.push(actId);
+            }
+            if (!result.activity.predecessor) {
+                result.activity.predecessor = actId;
+            }
+        }
+    });
+    
+    if (shouldClose) {
+        closeSlidePanel();
+    }
+    
+    render();
+}
+
+// Slide Panel Predecessor/Successor Functions
+function filterSlidePredecessorList() {
+    const search = document.getElementById('slide-pred-search').value.toLowerCase();
+    const dropdown = document.getElementById('slide-pred-dropdown');
+    
+    if (!slidePanelActivity) return;
+    const allActs = getAllActivities().filter(a => a.id !== slidePanelActivity.actId);
+    const filtered = allActs.filter(act => 
+        !slidePredecessors.includes(act.id) &&
+        (act.name.toLowerCase().includes(search) || 
+        act.swimlaneName.toLowerCase().includes(search) ||
+        act.sectionName.toLowerCase().includes(search))
+    );
+    
+    let html = '';
+    filtered.slice(0, 15).forEach(act => {
+        html += `<div class="searchable-dropdown-item" onclick="addSlidePredecessor('${act.id}')">
+            <div class="item-name">${act.name}</div>
+            <div class="item-meta">${act.swimlaneName} / ${act.sectionName}</div>
+        </div>`;
+    });
+    
+    if (filtered.length === 0) {
+        html = '<div class="searchable-dropdown-item none-option">No activities found</div>';
+    }
+    
+    dropdown.innerHTML = html;
+}
+
+function filterSlideSuccessorList() {
+    const search = document.getElementById('slide-succ-search').value.toLowerCase();
+    const dropdown = document.getElementById('slide-succ-dropdown');
+    
+    if (!slidePanelActivity) return;
+    const allActs = getAllActivities().filter(a => a.id !== slidePanelActivity.actId);
+    const filtered = allActs.filter(act => 
+        !slideSuccessors.includes(act.id) &&
+        (act.name.toLowerCase().includes(search) || 
+        act.swimlaneName.toLowerCase().includes(search) ||
+        act.sectionName.toLowerCase().includes(search))
+    );
+    
+    let html = '';
+    filtered.slice(0, 15).forEach(act => {
+        html += `<div class="searchable-dropdown-item" onclick="addSlideSuccessor('${act.id}')">
+            <div class="item-name">${act.name}</div>
+            <div class="item-meta">${act.swimlaneName} / ${act.sectionName}</div>
+        </div>`;
+    });
+    
+    if (filtered.length === 0) {
+        html = '<div class="searchable-dropdown-item none-option">No activities found</div>';
+    }
+    
+    dropdown.innerHTML = html;
+}
+
+function showSlidePredecessorDropdown() {
+    const dropdown = document.getElementById('slide-pred-dropdown');
+    dropdown.classList.add('visible');
+    filterSlidePredecessorList();
+    setTimeout(() => {
+        document.addEventListener('click', function closeHandler(e) {
+            const container = document.getElementById('slide-pred-search')?.closest('.searchable-select');
+            if (container && !container.contains(e.target)) {
+                dropdown.classList.remove('visible');
+                document.removeEventListener('click', closeHandler);
+            }
+        });
+    }, 0);
+}
+
+function showSlideSuccessorDropdown() {
+    const dropdown = document.getElementById('slide-succ-dropdown');
+    dropdown.classList.add('visible');
+    filterSlideSuccessorList();
+    setTimeout(() => {
+        document.addEventListener('click', function closeHandler(e) {
+            const container = document.getElementById('slide-succ-search')?.closest('.searchable-select');
+            if (container && !container.contains(e.target)) {
+                dropdown.classList.remove('visible');
+                document.removeEventListener('click', closeHandler);
+            }
+        });
+    }, 0);
+}
+
+function addSlidePredecessor(predId) {
+    if (!slidePredecessors.includes(predId)) {
+        slidePredecessors.push(predId);
+    }
+    document.getElementById('slide-pred-search').value = '';
+    document.getElementById('slide-pred-dropdown').classList.remove('visible');
+    renderSlideSelectedPredecessors();
+}
+
+function addSlideSuccessor(succId) {
+    if (!slideSuccessors.includes(succId)) {
+        slideSuccessors.push(succId);
+    }
+    document.getElementById('slide-succ-search').value = '';
+    document.getElementById('slide-succ-dropdown').classList.remove('visible');
+    renderSlideSelectedSuccessors();
+}
+
+function removeSlidePredecessor(predId) {
+    slidePredecessors = slidePredecessors.filter(id => id !== predId);
+    renderSlideSelectedPredecessors();
+}
+
+function removeSlideSuccessor(succId) {
+    slideSuccessors = slideSuccessors.filter(id => id !== succId);
+    renderSlideSelectedSuccessors();
+}
+
+function renderSlideSelectedPredecessors() {
+    const container = document.getElementById('slide-selected-preds');
+    if (slidePredecessors.length === 0) {
+        container.innerHTML = '<span style="color:var(--text-muted);font-size:12px;">None selected</span>';
+        return;
+    }
+    
+    const allActs = getAllActivities();
+    container.innerHTML = slidePredecessors.map(predId => {
+        const act = allActs.find(a => a.id === predId);
+        if (!act) return '';
+        return `<div class="selected-tag">
+            <span class="tag-name">${act.name}</span>
+            <span class="tag-remove" onclick="removeSlidePredecessor('${predId}')">×</span>
+        </div>`;
+    }).join('');
+}
+
+function renderSlideSelectedSuccessors() {
+    const container = document.getElementById('slide-selected-succs');
+    if (slideSuccessors.length === 0) {
+        container.innerHTML = '<span style="color:var(--text-muted);font-size:12px;">None selected</span>';
+        return;
+    }
+    
+    const allActs = getAllActivities();
+    container.innerHTML = slideSuccessors.map(succId => {
+        const act = allActs.find(a => a.id === succId);
+        if (!act) return '';
+        return `<div class="selected-tag">
+            <span class="tag-name">${act.name}</span>
+            <span class="tag-remove" onclick="removeSlideSuccessor('${succId}')">×</span>
+        </div>`;
+    }).join('');
+}
+
+function confirmActivity() {
+    const name = document.getElementById('activity-name').value || 'New Activity';
+    const isGate = document.getElementById('activity-gate').checked;
+    const isDeliverable = document.getElementById('activity-deliverable').checked;
+    const isShared = document.getElementById('activity-shared').checked;
+    const friction = document.getElementById('activity-friction').value || '';
+    const resolution = document.getElementById('activity-resolution').value || '';
+    const deliverableDetails = document.getElementById('activity-deliverable-details').value || '';
+    const notes = document.getElementById('activity-notes').value || '';
+    
+    const sharedWith = isShared ? getSelectedSharedWith() : [];
+    
+    let activityId = currentActivity;
+    
+    // Track old successors for cleanup
+    let oldSuccessorIds = [];
+    if (editMode && currentActivity) {
+        oldSuccessorIds = getSuccessors(currentActivity).map(s => s.activity.id);
+    }
+    
+    if (editMode && currentActivity) {
+        const act = getActivity(currentSwimlane, currentSection, currentActivity);
+        if (act) {
+            act.name = name;
+            act.isGate = isGate;
+            act.isDeliverable = isDeliverable;
+            act.isShared = isShared;
+            act.sharedWith = sharedWith;
+            act.predecessors = [...selectedPredecessors];
+            act.predecessor = selectedPredecessors.length > 0 ? selectedPredecessors[0] : null; // Keep for backward compat
+            act.friction = friction;
+            act.resolution = resolution;
+            act.deliverableDetails = deliverableDetails;
+            act.notes = notes;
+            if (isGate) { const snapped = snapToStageEnd(act.end); act.start = snapped; act.end = snapped; }
+            if (isShared && sharedWith.length) act.type = 'shared';
+            else { const sl = ganttData.swimlanes.find(s => s.id === currentSwimlane); act.type = sl?.type || 'ae'; }
+        }
+    } else {
+        const sl = ganttData.swimlanes.find(s => s.id === currentSwimlane);
+        if (!sl) return;
+        let sec = currentSection ? sl.sections.find(s => s.id === currentSection) : sl.sections[0];
+        if (!sec) { sec = { id: `${sl.id}_sec_default`, name: 'General', collapsed: false, activities: [] }; sl.sections.push(sec); }
+        const type = isShared && sharedWith.length ? 'shared' : sl.type;
+        const firstStageEnd = getStageEnds()[0];
+        activityId = `${sl.id}_${Date.now()}`;
+        sec.activities.push({
+            id: activityId, name,
+            start: isGate ? firstStageEnd : 0, end: isGate ? firstStageEnd : firstStageEnd,
+            type, isGate, isDeliverable, isShared, sharedWith, 
+            predecessors: [...selectedPredecessors],
+            predecessor: selectedPredecessors.length > 0 ? selectedPredecessors[0] : null,
+            friction, resolution, deliverableDetails, notes
+        });
+    }
+    
+    // Handle successors: set this activity as predecessor for selected successors
+    // First, remove this activity from old successors that are no longer selected
+    oldSuccessorIds.forEach(oldSuccId => {
+        if (!selectedSuccessors.includes(oldSuccId)) {
+            const result = findActivityById(oldSuccId);
+            if (result) {
+                if (Array.isArray(result.activity.predecessors)) {
+                    result.activity.predecessors = result.activity.predecessors.filter(p => p !== activityId);
+                }
+                if (result.activity.predecessor === activityId) {
+                    result.activity.predecessor = result.activity.predecessors?.[0] || null;
+                }
+            }
+        }
+    });
+    
+    // Then, add this activity as predecessor to new successors
+    selectedSuccessors.forEach(succId => {
+        const result = findActivityById(succId);
+        if (result) {
+            if (!Array.isArray(result.activity.predecessors)) {
+                result.activity.predecessors = result.activity.predecessor ? [result.activity.predecessor] : [];
+            }
+            if (!result.activity.predecessors.includes(activityId)) {
+                result.activity.predecessors.push(activityId);
+            }
+            if (!result.activity.predecessor) {
+                result.activity.predecessor = activityId;
+            }
+        }
+    });
+    
+    closeActivityModal();
+    render();
+}
+
+// Stages Modal
+function openStagesModal() {
+    renderStagesList();
+    document.getElementById('stages-modal').classList.add('visible');
+}
+
+function closeStagesModal() { document.getElementById('stages-modal').classList.remove('visible'); }
+
+function renderStagesList() {
+    const container = document.getElementById('stages-list');
+    container.innerHTML = ganttData.stages.map((stage, i) => {
+        const stageNum = stage.num !== undefined ? stage.num : (i + 1);
+        return `
+        <div class="stage-list-item" draggable="true" data-stage-id="${stage.id}" style="display:flex;align-items:center;gap:10px;padding:10px 8px;border-bottom:1px solid var(--border);cursor:grab;background:var(--bg-card);border-radius:6px;margin-bottom:6px;">
+            <span class="stage-drag-handle" style="color:var(--text-muted);font-size:14px;">☰</span>
+            <div style="width:20px;height:20px;border-radius:4px;background:${stage.color};flex-shrink:0;"></div>
+            <div style="flex:1;">
+                <div style="font-weight:500;font-size:13px;">Stage ${stageNum}: ${stage.name}</div>
+            </div>
+            <button class="btn small" onclick="openStageEditModal('${stage.id}')">Edit</button>
+            <button class="btn small danger" onclick="deleteStage('${stage.id}')" ${ganttData.stages.length <= 1 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>Delete</button>
+        </div>
+    `}).join('');
+    attachStageDragListeners();
+}
+
+let draggedStage = null;
+
+function attachStageDragListeners() {
+    document.querySelectorAll('.stage-list-item[draggable="true"]').forEach(el => {
+        el.addEventListener('dragstart', e => {
+            draggedStage = el.dataset.stageId;
+            el.style.opacity = '0.5';
+            e.dataTransfer.effectAllowed = 'move';
+        });
+        el.addEventListener('dragend', e => {
+            el.style.opacity = '1';
+            document.querySelectorAll('.stage-list-item').forEach(x => x.style.borderTop = '');
+            draggedStage = null;
+        });
+        el.addEventListener('dragover', e => {
+            e.preventDefault();
+            if (!draggedStage || el.dataset.stageId === draggedStage) return;
+            el.style.borderTop = '2px solid var(--ss-color)';
+        });
+        el.addEventListener('dragleave', e => {
+            el.style.borderTop = '';
+        });
+        el.addEventListener('drop', e => {
+            e.preventDefault();
+            el.style.borderTop = '';
+            if (!draggedStage || el.dataset.stageId === draggedStage) return;
+            const fromIdx = ganttData.stages.findIndex(s => s.id === draggedStage);
+            const toIdx = ganttData.stages.findIndex(s => s.id === el.dataset.stageId);
+            if (fromIdx === -1 || toIdx === -1) return;
+            const [moved] = ganttData.stages.splice(fromIdx, 1);
+            ganttData.stages.splice(toIdx, 0, moved);
+            renderStagesList();
+            render();
+        });
+    });
+}
+
+function addStage() {
+    const newId = `s_${Date.now()}`;
+    const colorIndex = ganttData.stages.length % STAGE_COLORS.length;
+    const newNum = ganttData.stages.length + 1;
+    ganttData.stages.push({ id: newId, num: String(newNum), name: `New Stage`, color: STAGE_COLORS[colorIndex] });
+    renderStagesList();
+    render();
+}
+
+function deleteStage(stageId) {
+    if (ganttData.stages.length <= 1) return;
+    if (!confirm('Delete this stage? Activities will be redistributed.')) return;
+    ganttData.stages = ganttData.stages.filter(s => s.id !== stageId);
+    renderStagesList();
+    render();
+}
+
+function openStageEditModal(stageId) {
+    editingStageId = stageId;
+    const stage = ganttData.stages.find(s => s.id === stageId);
+    if (!stage) return;
+    const idx = ganttData.stages.findIndex(s => s.id === stageId);
+    document.getElementById('stage-edit-num').value = stage.num !== undefined ? stage.num : (idx + 1);
+    document.getElementById('stage-edit-name').value = stage.name;
+    selectedStageColor = stage.color;
+    renderColorPicker();
+    document.getElementById('stage-edit-modal').classList.add('visible');
+}
+
+function closeStageEditModal() { document.getElementById('stage-edit-modal').classList.remove('visible'); editingStageId = null; }
+
+function renderColorPicker() {
+    const container = document.getElementById('stage-color-picker');
+    container.innerHTML = STAGE_COLORS.map(color => `
+        <div class="color-option ${selectedStageColor === color ? 'selected' : ''}" 
+             style="background:${color};" 
+             onclick="selectStageColor('${color}')"></div>
+    `).join('');
+}
+
+function selectStageColor(color) {
+    selectedStageColor = color;
+    renderColorPicker();
+}
+
+function confirmStageEdit() {
+    if (!editingStageId) return;
+    const stage = ganttData.stages.find(s => s.id === editingStageId);
+    if (stage) {
+        stage.num = document.getElementById('stage-edit-num').value;
+        stage.name = document.getElementById('stage-edit-name').value || stage.name;
+        stage.color = selectedStageColor;
+    }
+    closeStageEditModal();
+    renderStagesList();
+    render();
+}
+
+// Import/Export
+function exportJSON() {
+    const json = JSON.stringify(ganttData, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'pricefx-sales-cycle.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+function importJSON(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (data.swimlanes && Array.isArray(data.swimlanes)) {
+                if (!data.stages) {
+                    data.stages = [
+                        { id: 's1', name: 'Stage 1', color: '#58a6ff' },
+                        { id: 's2', name: 'Stage 2', color: '#a371f7' },
+                        { id: 's3', name: 'Stage 3', color: '#f778ba' },
+                        { id: 's4', name: 'Stage 4', color: '#56d364' }
+                    ];
+                }
+                ganttData = data;
+                render();
+                alert('Imported successfully!');
+            } else {
+                alert('Invalid file format.');
+            }
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+}
+
+function saveToLocalStorage() {
+    localStorage.setItem('pricefx-gantt-v6', JSON.stringify(ganttData));
+    alert('Saved!');
+}
+
+function loadFromLocalStorage() {
+    const saved = localStorage.getItem('pricefx-gantt-v6');
+    if (saved) {
+        try { ganttData = JSON.parse(saved); } catch (e) { console.error('Load failed'); }
+    }
+}
+
+function resetToDefault() {
+    if (confirm('Reset all changes?')) {
+        localStorage.removeItem('pricefx-gantt-v6');
+        location.reload();
+    }
+}
+
+loadTheme();
+loadFromLocalStorage();
+render();

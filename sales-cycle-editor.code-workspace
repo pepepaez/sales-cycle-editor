@@ -1,0 +1,25 @@
+{
+    "folders": [
+        {
+            "path": "."
+        }
+    ],
+    "settings": {
+        "editor.tabSize": 4,
+        "editor.formatOnSave": true,
+        "files.associations": {
+            "*.css": "css",
+            "*.js": "javascript",
+            "*.html": "html"
+        },
+        "liveServer.settings.port": 5500,
+        "liveServer.settings.root": "/"
+    },
+    "extensions": {
+        "recommendations": [
+            "ritwickdey.liveserver",
+            "esbenp.prettier-vscode",
+            "formulahendry.auto-rename-tag"
+        ]
+    }
+}

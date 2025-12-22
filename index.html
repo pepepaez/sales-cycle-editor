@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales Cycle Interactive Editor</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="top-header">
+        <div class="header-content">
+            <div class="title-block">
+                <h1>Sales Cycle Interactive Editor</h1>
+                <p class="subtitle">Tutorial Mode - Hover over activities to see how features work. Use Reset or Import to start fresh.</p>
+            </div>
+            <div class="toolbar">
+                <button class="theme-toggle" onclick="toggleTheme()">
+                    <span id="theme-icon">🌙</span>
+                    <span id="theme-label">Dark</span>
+                </button>
+                <button class="btn" onclick="openStagesModal()">Stages</button>
+                <button class="btn" onclick="exportJSON()">Export</button>
+                <input type="file" id="file-input" class="file-input" accept=".json" onchange="importJSON(event)">
+                <button class="btn" onclick="document.getElementById('file-input').click()">Import</button>
+                <button class="btn primary" onclick="saveToLocalStorage()">Save</button>
+                <button class="btn danger" onclick="resetToDefault()">Reset</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="legend" id="legend"></div>
+        <div class="chart-resize-container">
+            <div class="gantt-wrapper">
+                <div class="gantt-inner" id="gantt-inner">
+                    <div class="stage-headers" id="stage-headers"></div>
+                    <div id="gantt-content"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="tooltip" id="tooltip"></div>
+    
+    <!-- Activity Modal -->
+    <div class="modal-overlay" id="activity-modal">
+        <div class="modal">
+            <h2 id="modal-title">Add Activity</h2>
+            <div class="form-group">
+                <label>Activity Name</label>
+                <input type="text" id="activity-name" placeholder="Enter activity name">
+            </div>
+            <div class="form-group">
+                <label>Properties</label>
+                <div class="checkbox-group">
+                    <label class="checkbox-item"><input type="checkbox" id="activity-gate" onchange="toggleGateNote()"><span>Exit Gate</span></label>
+                    <label class="checkbox-item"><input type="checkbox" id="activity-deliverable"><span>Deliverable</span></label>
+                    <label class="checkbox-item"><input type="checkbox" id="activity-shared" onchange="toggleSharedWith()"><span>Shared</span></label>
+                </div>
+                <div class="gate-note" id="gate-note" style="display:none;">Exit gates snap to stage boundaries when moved.</div>
+                <div class="shared-with-section hidden" id="shared-with-section">
+                    <label style="margin-bottom:8px;display:block;">Shared With</label>
+                    <div class="checkbox-group" id="shared-with-checkboxes"></div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Predecessors (must complete before this starts)</label>
+                <div class="searchable-select">
+                    <input type="text" id="activity-predecessor-search" placeholder="Search activities..." oninput="filterPredecessorList()" onfocus="showPredecessorDropdown()">
+                    <div class="searchable-dropdown" id="predecessor-dropdown"></div>
+                </div>
+                <div class="selected-items" id="selected-predecessors"></div>
+            </div>
+            <div class="form-group">
+                <label>Successors (this activity must complete before selected starts)</label>
+                <div class="searchable-select">
+                    <input type="text" id="activity-successor-search" placeholder="Search activities..." oninput="filterSuccessorList()" onfocus="showSuccessorDropdown()">
+                    <div class="searchable-dropdown" id="successor-dropdown"></div>
+                </div>
+                <div class="selected-items" id="selected-successors"></div>
+            </div>
+            <div class="form-section">
+                <div class="form-section-title friction">⚠ Friction Points</div>
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label>Known Friction</label>
+                    <textarea id="activity-friction" placeholder="Describe friction points..."></textarea>
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Resolution Path</label>
+                    <textarea id="activity-resolution" placeholder="How to resolve..."></textarea>
+                </div>
+            </div>
+            <div class="form-section">
+                <div class="form-section-title deliverable">📄 Deliverable Details</div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Description</label>
+                    <textarea id="activity-deliverable-details" placeholder="Describe the deliverable..."></textarea>
+                </div>
+            </div>
+            <div class="form-section">
+                <div class="form-section-title notes">📝 Additional Notes</div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Notes & Details</label>
+                    <textarea id="activity-notes" placeholder="Capture additional details, context, instructions, or any other relevant information..."></textarea>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeActivityModal()">Cancel</button>
+                <button class="btn primary" id="modal-confirm-btn" onclick="confirmActivity()">Add</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Section Modal -->
+    <div class="modal-overlay" id="section-modal">
+        <div class="modal small">
+            <h2 id="section-modal-title">Add Section</h2>
+            <div class="form-group">
+                <label>Section Name</label>
+                <input type="text" id="section-name" placeholder="Enter section name">
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeSectionModal()">Cancel</button>
+                <button class="btn primary" onclick="confirmSection()">Save</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Stages Modal -->
+    <div class="modal-overlay" id="stages-modal">
+        <div class="modal">
+            <h2>Manage Stages</h2>
+            <div id="stages-list"></div>
+            <div style="margin-top:14px;">
+                <button class="btn primary" onclick="addStage()">+ Add Stage</button>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeStagesModal()">Close</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Stage Edit Modal -->
+    <div class="modal-overlay" id="stage-edit-modal">
+        <div class="modal small">
+            <h2 id="stage-edit-title">Edit Stage</h2>
+            <div class="form-group">
+                <label>Stage Number</label>
+                <input type="text" id="stage-edit-num" placeholder="0, 1, 2, etc.">
+            </div>
+            <div class="form-group">
+                <label>Stage Name</label>
+                <input type="text" id="stage-edit-name" placeholder="Stage name">
+            </div>
+            <div class="form-group">
+                <label>Color</label>
+                <div class="color-picker" id="stage-color-picker"></div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeStageEditModal()">Cancel</button>
+                <button class="btn primary" onclick="confirmStageEdit()">Save</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Slide Panel -->
+    <div class="slide-panel" id="slide-panel">
+        <div class="slide-panel-resize" id="slide-panel-resize"></div>
+        <div class="slide-panel-header">
+            <h3 id="slide-panel-title">Edit Activity</h3>
+            <button class="slide-panel-close" onclick="closeSlidePanel()">&times;</button>
+        </div>
+        <div class="slide-panel-body">
+            <div class="form-section">
+                <div class="form-section-title">Basic Info</div>
+                <div class="form-group">
+                    <label>Activity Name</label>
+                    <input type="text" id="slide-name">
+                </div>
+                <div class="form-group">
+                    <label>Properties</label>
+                    <div class="checkbox-group">
+                        <label class="checkbox-item"><input type="checkbox" id="slide-gate"><span>Exit Gate</span></label>
+                        <label class="checkbox-item"><input type="checkbox" id="slide-deliverable"><span>Deliverable</span></label>
+                        <label class="checkbox-item"><input type="checkbox" id="slide-shared" onchange="toggleSlideSharedWith()"><span>Shared</span></label>
+                    </div>
+                </div>
+                <div class="form-group" id="slide-shared-with-section" style="display:none;">
+                    <label>Shared With</label>
+                    <div class="checkbox-group" id="slide-shared-checkboxes"></div>
+                </div>
+            </div>
+            <div class="form-section">
+                <div class="form-section-title">Dependencies</div>
+                <div class="form-group">
+                    <label>Predecessors</label>
+                    <div class="searchable-select">
+                        <input type="text" id="slide-pred-search" placeholder="Search activities..." oninput="filterSlidePredecessorList()" onfocus="showSlidePredecessorDropdown()">
+                        <div class="searchable-dropdown" id="slide-pred-dropdown"></div>
+                    </div>
+                    <div class="selected-items" id="slide-selected-preds"></div>
+                </div>
+                <div class="form-group">
+                    <label>Successors</label>
+                    <div class="searchable-select">
+                        <input type="text" id="slide-succ-search" placeholder="Search activities..." oninput="filterSlideSuccessorList()" onfocus="showSlideSuccessorDropdown()">
+                        <div class="searchable-dropdown" id="slide-succ-dropdown"></div>
+                    </div>
+                    <div class="selected-items" id="slide-selected-succs"></div>
+                </div>
+            </div>
+            <div class="form-section">
+                <div class="form-section-title">Friction & Resolution</div>
+                <div class="form-group">
+                    <label>Friction Point</label>
+                    <textarea id="slide-friction" placeholder="Known challenges or blockers..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Resolution Path</label>
+                    <textarea id="slide-resolution" placeholder="How to address the friction..."></textarea>
+                </div>
+            </div>
+            <div class="form-section">
+                <div class="form-section-title">Details</div>
+                <div class="form-group">
+                    <label>Deliverable Details</label>
+                    <textarea id="slide-deliverable-details" placeholder="What is produced by this activity..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Additional Notes</label>
+                    <textarea id="slide-notes" placeholder="Any additional context or information..."></textarea>
+                </div>
+            </div>
+        </div>
+        <div class="slide-panel-footer">
+            <button class="btn danger" id="slide-delete-btn">Delete</button>
+            <button class="btn primary" onclick="saveSlidePanel()">Save & Close</button>
+        </div>
+    </div>
+    
+    <!-- Swimlane Modal -->
+    <div class="modal-overlay" id="swimlane-modal">
+        <div class="modal small">
+            <h2 id="swimlane-modal-title">Add Swimlane</h2>
+            <div class="form-group">
+                <label>Swimlane Name</label>
+                <input type="text" id="swimlane-name" placeholder="e.g., ACCOUNT EXECUTIVE">
+            </div>
+            <div class="form-group">
+                <label>Color</label>
+                <div class="color-picker" id="swimlane-color-picker"></div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeSwimlaneModal()">Cancel</button>
+                <button class="btn primary" onclick="confirmSwimlane()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/data.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
