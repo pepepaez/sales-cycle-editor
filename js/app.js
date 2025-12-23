@@ -4,7 +4,42 @@ let editSectionMode = false, currentEditSection = null;
 let editingStageId = null, selectedStageColor = null;
 let dragState = null, draggedSection = null, draggedActivity = null;
 let isDarkMode = true;
+let hasUnsavedChanges = false;
+let lastSavedState = null;
+let lastImportedData = null;
+let currentTextSize = 14;
+let isAutoSaving = false; // Flag to bypass change detection during auto-saves
 const tooltip = document.getElementById('tooltip');
+
+function markAsChanged() {
+    hasUnsavedChanges = true;
+    updateUnsavedIndicator();
+}
+
+function markAsSaved() {
+    hasUnsavedChanges = false;
+    lastSavedState = JSON.stringify(ganttData);
+    updateUnsavedIndicator();
+}
+
+function updateUnsavedIndicator() {
+    const indicator = document.getElementById('unsaved-indicator');
+    const saveBtn = document.querySelector('.btn.primary[onclick="saveToLocalStorage()"]');
+    if (hasUnsavedChanges) {
+        indicator.style.display = 'inline';
+        indicator.title = 'You have unsaved changes';
+        if (saveBtn) {
+            saveBtn.style.background = '#ff6b6b';
+            saveBtn.textContent = 'Save*';
+        }
+    } else {
+        indicator.style.display = 'none';
+        if (saveBtn) {
+            saveBtn.style.background = '';
+            saveBtn.textContent = 'Save';
+        }
+    }
+}
 
 function getStageEnds() {
     const count = ganttData.stages.length;
@@ -13,6 +48,47 @@ function getStageEnds() {
 
 function getStageWidth() {
     return 100 / ganttData.stages.length;
+}
+
+// Convert stage-based position to percentage (for display)
+function stageToPercent(stagePos, totalStages = ganttData.stages.length) {
+    return (stagePos / totalStages) * 100;
+}
+
+// Convert percentage to stage-based position (for storage)
+function percentToStage(percent, totalStages = ganttData.stages.length) {
+    return (percent / 100) * totalStages;
+}
+
+// Migrate old percentage-based activities to stage-based positioning
+function migrateActivityPositioning() {
+    const stageCount = ganttData.stages.length;
+    
+    ganttData.swimlanes.forEach(sl => {
+        sl.sections.forEach(sec => {
+            sec.activities.forEach(act => {
+                // Only migrate if using old percentage system (0-100 range)
+                if (act.start <= 100 && act.end <= 100 && !act._stageBasedPos) {
+                    // Convert from percentage to stage-based positioning
+                    act.startStage = percentToStage(act.start, stageCount);
+                    act.endStage = percentToStage(act.end, stageCount);
+                    act._stageBasedPos = true; // Mark as migrated
+                }
+                
+                // Ensure we have stage-based positions
+                if (act.startStage === undefined) {
+                    act.startStage = percentToStage(act.start || 0, stageCount);
+                }
+                if (act.endStage === undefined) {
+                    act.endStage = percentToStage(act.end || stageCount, stageCount);
+                }
+                
+                // Update display percentages based on current stage count
+                act.start = stageToPercent(act.startStage);
+                act.end = stageToPercent(act.endStage);
+            });
+        });
+    });
 }
 
 function snapToStageEnd(pos) {
@@ -41,6 +117,26 @@ function loadTheme() {
         document.getElementById('theme-icon').textContent = '☀️';
         document.getElementById('theme-label').textContent = 'Light';
     }
+}
+
+function changeTextSize() {
+    const selector = document.getElementById('text-size-selector');
+    currentTextSize = parseInt(selector.value);
+    localStorage.setItem('pricefx-gantt-text-size', currentTextSize);
+    applyTextSize();
+}
+
+function applyTextSize() {
+    document.documentElement.style.setProperty('--chart-text-size', currentTextSize + 'px');
+}
+
+function loadTextSize() {
+    const saved = localStorage.getItem('pricefx-gantt-text-size');
+    if (saved) {
+        currentTextSize = parseInt(saved);
+        document.getElementById('text-size-selector').value = currentTextSize;
+    }
+    applyTextSize();
 }
 
 function findActivityById(id) {
@@ -97,6 +193,7 @@ function updateGridTemplates() {
 }
 
 function render() {
+    migrateActivityPositioning(); // Ensure positions are up to date
     renderLegend();
     renderStageHeaders();
     renderSwimlanes();
@@ -289,6 +386,7 @@ function toggleSectionCollapse(slId, secId) {
     const sec = sl.sections.find(s => s.id === secId);
     if (!sec) return;
     sec.collapsed = !sec.collapsed;
+    markAsChanged();
     render();
 }
 
@@ -325,6 +423,7 @@ function attachReorderListeners() {
             if (fi === -1 || ti === -1) return;
             const [rem] = sl.sections.splice(fi, 1);
             sl.sections.splice(ti, 0, rem);
+            markAsChanged();
             render();
         });
     });
@@ -365,6 +464,7 @@ function attachReorderListeners() {
             if (!tsecObj) return;
             const ti = tsecObj.activities.findIndex(a => a.id === tact);
             ti === -1 ? tsecObj.activities.push(moved) : tsecObj.activities.splice(ti, 0, moved);
+            markAsChanged();
             render();
         });
     });
@@ -394,6 +494,7 @@ function attachReorderListeners() {
             const tsecObj = sl.sections.find(s => s.id === tsec);
             if (!tsecObj) return;
             tsecObj.activities.push(moved);
+            markAsChanged();
             render();
         });
     });
@@ -426,8 +527,6 @@ function showTooltip(e) {
         const gateStageIdx = getStageEnds().findIndex(end => Math.abs(end - act.start) < 1);
         const gateStage = ganttData.stages[gateStageIdx >= 0 ? gateStageIdx : ganttData.stages.length - 1];
         html += `<div class="tooltip-row"><span class="tooltip-label">Type:</span><span class="tooltip-value" style="color:var(--gate-color);">Exit Gate (${gateStage?.name || 'End'})</span></div>`;
-    } else {
-        html += `<div class="tooltip-row"><span class="tooltip-label">Range:</span><span class="tooltip-value">${act.start}% - ${act.end}%</span></div>`;
     }
     if (act.isDeliverable) html += `<div class="tooltip-row"><span class="tooltip-label">Deliverable:</span><span class="tooltip-value" style="color:var(--deliverable-color);">Yes</span></div>`;
     if (act.isShared && act.sharedWith.length) html += `<div class="tooltip-row"><span class="tooltip-label">Shared:</span><span class="tooltip-value" style="color:var(--shared-color);">${act.sharedWith.map(s => s.toUpperCase()).join(', ')}</span></div>`;
@@ -516,7 +615,29 @@ function hideTooltip() {
 }
 
 function attachDragListeners() {
-    document.querySelectorAll('.bar').forEach(bar => bar.addEventListener('mousedown', startBarDrag));
+    document.querySelectorAll('.bar').forEach(bar => {
+        bar.addEventListener('mousedown', startBarDrag);
+        bar.addEventListener('dblclick', openBarEditPanel);
+    });
+}
+
+function openBarEditPanel(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // If slide panel is already open, close it first without saving
+    if (document.getElementById('slide-panel').classList.contains('open')) {
+        closeSlidePanel(false); // Close without saving
+    }
+    
+    const bar = e.currentTarget;
+    const actId = bar.dataset.activity;
+    const result = findActivityById(actId);
+    
+    if (result) {
+        const { swimlane, section, activity } = result;
+        openSlidePanel(swimlane.id, section.id, actId);
+    }
 }
 
 function startBarDrag(e) {
@@ -587,7 +708,17 @@ function onBarDrag(e) {
 }
 
 function endBarDrag() {
-    if (dragState?.bar) dragState.bar.classList.remove('dragging');
+    if (dragState?.bar) {
+        dragState.bar.classList.remove('dragging');
+        
+        // Update stage-based positions after drag ends
+        if (dragState.activity) {
+            dragState.activity.startStage = percentToStage(dragState.activity.start);
+            dragState.activity.endStage = percentToStage(dragState.activity.end);
+        }
+        
+        markAsChanged(); // Mark as changed when bar manipulation ends
+    }
     dragState = null;
     document.removeEventListener('mousemove', onBarDrag);
     document.removeEventListener('mouseup', endBarDrag);
@@ -609,14 +740,17 @@ function toggleGateProp(slId, secId, actId) {
             const snapped = snapToStageEnd(act.end);
             act.start = snapped;
             act.end = snapped;
+            act.startStage = percentToStage(snapped);
+            act.endStage = percentToStage(snapped);
         }
+        markAsChanged();
         render();
     }
 }
 
 function toggleDeliverableProp(slId, secId, actId) {
     const act = getActivity(slId, secId, actId);
-    if (act) { act.isDeliverable = !act.isDeliverable; render(); }
+    if (act) { act.isDeliverable = !act.isDeliverable; markAsChanged(); render(); }
 }
 
 function deleteActivity(slId, secId, actId) {
@@ -627,6 +761,7 @@ function deleteActivity(slId, secId, actId) {
     if (!sec) return;
     ganttData.swimlanes.forEach(s => s.sections.forEach(sc => sc.activities.forEach(a => { if (a.predecessor === actId) a.predecessor = null; })));
     sec.activities = sec.activities.filter(a => a.id !== actId);
+    markAsChanged();
     render();
 }
 
@@ -640,6 +775,7 @@ function deleteSection(slId, secId) {
         ganttData.swimlanes.forEach(s => s.sections.forEach(sc => sc.activities.forEach(a => { if (actIds.includes(a.predecessor)) a.predecessor = null; })));
     }
     sl.sections = sl.sections.filter(s => s.id !== secId);
+    markAsChanged();
     render();
 }
 
@@ -840,6 +976,7 @@ function toggleSwimlaneCollapse(slId) {
     const sl = ganttData.swimlanes.find(s => s.id === slId);
     if (sl) {
         sl.collapsed = !sl.collapsed;
+        markAsChanged();
         render();
     }
 }
@@ -902,6 +1039,7 @@ function confirmSwimlane() {
             sections: [{ id: `${newId}_sec_1`, name: 'General', collapsed: false, activities: [] }]
         });
     }
+    markAsChanged();
     closeSwimlaneModal();
     render();
 }
@@ -923,6 +1061,7 @@ function deleteSwimlane(slId) {
     })));
     
     ganttData.swimlanes = ganttData.swimlanes.filter(s => s.id !== slId);
+    markAsChanged();
     render();
 }
 
@@ -956,6 +1095,7 @@ function confirmSection() {
     } else {
         sl.sections.push({ id: `${currentSwimlane}_sec_${Date.now()}`, name, collapsed: false, activities: [] });
     }
+    markAsChanged();
     closeSectionModal();
     render();
 }
@@ -1071,7 +1211,9 @@ let slideSuccessors = [];
 function openSlidePanel(slId, secId, actId) {
     // Auto-save previous activity if panel was already open
     if (slidePanelActivity && slidePanelActivity.actId !== actId) {
+        isAutoSaving = true; // Set flag to prevent change detection during auto-save
         saveSlidePanel(false); // Save without closing
+        isAutoSaving = false; // Reset flag
     }
     
     const act = getActivity(slId, secId, actId);
@@ -1199,42 +1341,93 @@ function saveSlidePanel(shouldClose = true) {
     const act = getActivity(slId, secId, actId);
     if (!act) return;
     
-    // Save basic fields
-    act.name = document.getElementById('slide-name').value || 'Activity';
-    act.isGate = document.getElementById('slide-gate').checked;
-    act.isDeliverable = document.getElementById('slide-deliverable').checked;
-    act.isShared = document.getElementById('slide-shared').checked;
-    act.friction = document.getElementById('slide-friction').value || '';
-    act.resolution = document.getElementById('slide-resolution').value || '';
-    act.deliverableDetails = document.getElementById('slide-deliverable-details').value || '';
-    act.notes = document.getElementById('slide-notes').value || '';
+    // Store original values for comparison
+    const originalState = {
+        name: act.name,
+        isGate: act.isGate,
+        isDeliverable: act.isDeliverable,
+        isShared: act.isShared,
+        friction: act.friction || '',
+        resolution: act.resolution || '',
+        deliverableDetails: act.deliverableDetails || '',
+        notes: act.notes || '',
+        sharedWith: [...(act.sharedWith || [])],
+        predecessors: [...(act.predecessors || [])],
+        start: act.start,
+        end: act.end
+    };
     
-    // Save shared with
-    if (act.isShared) {
+    // Get new values
+    const newName = document.getElementById('slide-name').value || 'Activity';
+    const newIsGate = document.getElementById('slide-gate').checked;
+    const newIsDeliverable = document.getElementById('slide-deliverable').checked;
+    const newIsShared = document.getElementById('slide-shared').checked;
+    const newFriction = document.getElementById('slide-friction').value || '';
+    const newResolution = document.getElementById('slide-resolution').value || '';
+    const newDeliverableDetails = document.getElementById('slide-deliverable-details').value || '';
+    const newNotes = document.getElementById('slide-notes').value || '';
+    
+    // Get new shared with
+    let newSharedWith = [];
+    if (newIsShared) {
         const checkboxes = document.querySelectorAll('#slide-shared-checkboxes input[type="checkbox"]:checked');
-        act.sharedWith = Array.from(checkboxes).map(cb => cb.dataset.swimlaneId);
-    } else {
-        act.sharedWith = [];
+        newSharedWith = Array.from(checkboxes).map(cb => cb.dataset.swimlaneId);
     }
     
-    // Handle gate snapping
-    if (act.isGate) {
+    // Calculate new position for gates
+    let newStart = act.start;
+    let newEnd = act.end;
+    if (newIsGate) {
         const snapped = snapToStageEnd(act.end);
-        act.start = snapped;
-        act.end = snapped;
+        newStart = snapped;
+        newEnd = snapped;
     }
     
     // Save predecessors
     const oldPreds = Array.isArray(act.predecessors) ? [...act.predecessors] : (act.predecessor ? [act.predecessor] : []);
-    act.predecessors = [...slidePredecessors];
-    act.predecessor = slidePredecessors.length > 0 ? slidePredecessors[0] : null;
+    const newPredecessors = [...slidePredecessors];
     
     // Save successors - update other activities
     const oldSuccs = getSuccessors(actId).map(s => s.activity.id);
+    const newSuccessors = [...slideSuccessors];
+    
+    // Check if anything actually changed
+    const hasChanges = (
+        originalState.name !== newName ||
+        originalState.isGate !== newIsGate ||
+        originalState.isDeliverable !== newIsDeliverable ||
+        originalState.isShared !== newIsShared ||
+        originalState.friction !== newFriction ||
+        originalState.resolution !== newResolution ||
+        originalState.deliverableDetails !== newDeliverableDetails ||
+        originalState.notes !== newNotes ||
+        JSON.stringify(originalState.sharedWith.sort()) !== JSON.stringify(newSharedWith.sort()) ||
+        JSON.stringify(originalState.predecessors.sort()) !== JSON.stringify(newPredecessors.sort()) ||
+        JSON.stringify(oldSuccs.sort()) !== JSON.stringify(newSuccessors.sort()) ||
+        originalState.start !== newStart ||
+        originalState.end !== newEnd
+    );
+    
+    // Apply changes
+    act.name = newName;
+    act.isGate = newIsGate;
+    act.isDeliverable = newIsDeliverable;
+    act.isShared = newIsShared;
+    act.friction = newFriction;
+    act.resolution = newResolution;
+    act.deliverableDetails = newDeliverableDetails;
+    act.notes = newNotes;
+    act.sharedWith = newSharedWith;
+    act.start = newStart;
+    act.end = newEnd;
+    act.startStage = percentToStage(newStart);
+    act.endStage = percentToStage(newEnd);
+    act.predecessors = newPredecessors;
+    act.predecessor = newPredecessors.length > 0 ? newPredecessors[0] : null;
     
     // Remove this activity from old successors that are no longer selected
     oldSuccs.forEach(oldSuccId => {
-        if (!slideSuccessors.includes(oldSuccId)) {
+        if (!newSuccessors.includes(oldSuccId)) {
             const result = findActivityById(oldSuccId);
             if (result) {
                 if (Array.isArray(result.activity.predecessors)) {
@@ -1248,7 +1441,7 @@ function saveSlidePanel(shouldClose = true) {
     });
     
     // Add this activity as predecessor to new successors
-    slideSuccessors.forEach(succId => {
+    newSuccessors.forEach(succId => {
         const result = findActivityById(succId);
         if (result) {
             if (!Array.isArray(result.activity.predecessors)) {
@@ -1267,6 +1460,10 @@ function saveSlidePanel(shouldClose = true) {
         closeSlidePanel();
     }
     
+    // Only mark as changed if there were actual changes and this isn't an auto-save
+    if (hasChanges && !isAutoSaving) {
+        markAsChanged();
+    }
     render();
 }
 
@@ -1455,7 +1652,13 @@ function confirmActivity() {
             act.resolution = resolution;
             act.deliverableDetails = deliverableDetails;
             act.notes = notes;
-            if (isGate) { const snapped = snapToStageEnd(act.end); act.start = snapped; act.end = snapped; }
+            if (isGate) { 
+                const snapped = snapToStageEnd(act.end); 
+                act.start = snapped; 
+                act.end = snapped; 
+                act.startStage = percentToStage(snapped);
+                act.endStage = percentToStage(snapped);
+            }
             if (isShared && sharedWith.length) act.type = 'shared';
             else { const sl = ganttData.swimlanes.find(s => s.id === currentSwimlane); act.type = sl?.type || 'ae'; }
         }
@@ -1467,9 +1670,16 @@ function confirmActivity() {
         const type = isShared && sharedWith.length ? 'shared' : sl.type;
         const firstStageEnd = getStageEnds()[0];
         activityId = `${sl.id}_${Date.now()}`;
+        const stageCount = ganttData.stages.length;
+        const startPercent = isGate ? firstStageEnd : 0;
+        const endPercent = isGate ? firstStageEnd : firstStageEnd;
+        
         sec.activities.push({
             id: activityId, name,
-            start: isGate ? firstStageEnd : 0, end: isGate ? firstStageEnd : firstStageEnd,
+            start: startPercent, end: endPercent,
+            startStage: percentToStage(startPercent, stageCount),
+            endStage: percentToStage(endPercent, stageCount),
+            _stageBasedPos: true,
             type, isGate, isDeliverable, isShared, sharedWith, 
             predecessors: [...selectedPredecessors],
             predecessor: selectedPredecessors.length > 0 ? selectedPredecessors[0] : null,
@@ -1509,6 +1719,7 @@ function confirmActivity() {
         }
     });
     
+    markAsChanged();
     closeActivityModal();
     render();
 }
@@ -1570,6 +1781,7 @@ function attachStageDragListeners() {
             if (fromIdx === -1 || toIdx === -1) return;
             const [moved] = ganttData.stages.splice(fromIdx, 1);
             ganttData.stages.splice(toIdx, 0, moved);
+            markAsChanged();
             renderStagesList();
             render();
         });
@@ -1581,6 +1793,11 @@ function addStage() {
     const colorIndex = ganttData.stages.length % STAGE_COLORS.length;
     const newNum = ganttData.stages.length + 1;
     ganttData.stages.push({ id: newId, num: String(newNum), name: `New Stage`, color: STAGE_COLORS[colorIndex] });
+    
+    // Recalculate all activity positions based on new stage count
+    migrateActivityPositioning();
+    
+    markAsChanged();
     renderStagesList();
     render();
 }
@@ -1589,6 +1806,11 @@ function deleteStage(stageId) {
     if (ganttData.stages.length <= 1) return;
     if (!confirm('Delete this stage? Activities will be redistributed.')) return;
     ganttData.stages = ganttData.stages.filter(s => s.id !== stageId);
+    
+    // Recalculate all activity positions based on new stage count
+    migrateActivityPositioning();
+    
+    markAsChanged();
     renderStagesList();
     render();
 }
@@ -1629,6 +1851,7 @@ function confirmStageEdit() {
         stage.name = document.getElementById('stage-edit-name').value || stage.name;
         stage.color = selectedStageColor;
     }
+    markAsChanged();
     closeStageEditModal();
     renderStagesList();
     render();
@@ -1636,16 +1859,35 @@ function confirmStageEdit() {
 
 // Import/Export
 function exportJSON() {
+    // Get current filename without extension for the prompt
+    const currentFilename = document.getElementById('project-filename').textContent.trim();
+    const baseFilename = currentFilename.replace('.json', '');
+    
+    const filename = prompt('Enter filename:', baseFilename);
+    if (filename === null) return; // User cancelled
+    
     const json = JSON.stringify(ganttData, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'pricefx-sales-cycle.json';
+    
+    // Ensure .json extension
+    let finalFilename = filename.trim() || 'Editor Tutorial';
+    if (!finalFilename.endsWith('.json')) {
+        finalFilename += '.json';
+    }
+    
+    // Update the displayed filename
+    document.getElementById('project-filename').textContent = finalFilename;
+    
+    a.download = finalFilename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    
+    markAsSaved(); // Mark as saved since we just saved with new name
 }
 
 function importJSON(event) {
@@ -1665,6 +1907,16 @@ function importJSON(event) {
                     ];
                 }
                 ganttData = data;
+                lastImportedData = JSON.parse(JSON.stringify(data)); // Store deep copy of imported data
+                
+                // Update displayed filename to imported file name
+                let importedFilename = file.name;
+                if (!importedFilename.endsWith('.json')) {
+                    importedFilename += '.json';
+                }
+                document.getElementById('project-filename').textContent = importedFilename;
+                
+                markAsSaved(); // Mark as saved since we just loaded new data
                 render();
                 alert('Imported successfully!');
             } else {
@@ -1679,8 +1931,40 @@ function importJSON(event) {
 }
 
 function saveToLocalStorage() {
-    localStorage.setItem('pricefx-gantt-v6', JSON.stringify(ganttData));
-    alert('Saved!');
+    const json = JSON.stringify(ganttData, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    
+    // Get current filename from display
+    const filenameSpan = document.getElementById('project-filename');
+    let currentFilename = filenameSpan.textContent.trim() || 'Editor Tutorial.json';
+    
+    // Remove .json extension for processing
+    if (currentFilename.endsWith('.json')) {
+        currentFilename = currentFilename.replace('.json', '');
+    }
+    
+    // Extract version number and base name
+    const versionMatch = currentFilename.match(/^(.+?)(?:_v(\d+))?$/);
+    const baseName = versionMatch[1];
+    const currentVersion = versionMatch[2] ? parseInt(versionMatch[2]) : 0;
+    const newVersion = currentVersion + 1;
+    
+    // Create new filename with incremented version
+    const filename = `${baseName}_v${newVersion}.json`;
+    
+    // Update the displayed filename to match what was actually saved
+    filenameSpan.textContent = filename;
+    
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    markAsSaved();
 }
 
 function loadFromLocalStorage() {
@@ -1691,12 +1975,36 @@ function loadFromLocalStorage() {
 }
 
 function resetToDefault() {
-    if (confirm('Reset all changes?')) {
-        localStorage.removeItem('pricefx-gantt-v6');
-        location.reload();
+    const message = lastImportedData ? 
+        'Reset to last uploaded file? All unsaved changes will be lost.' : 
+        'Reset to tutorial data? All unsaved changes will be lost.';
+    
+    if (confirm(message)) {
+        if (lastImportedData) {
+            // Reload the last imported data
+            ganttData = JSON.parse(JSON.stringify(lastImportedData));
+        } else {
+            // Reload tutorial data by refreshing the page
+            localStorage.removeItem('pricefx-gantt-v6');
+            location.reload();
+            return;
+        }
+        markAsSaved();
+        render();
     }
 }
 
+// Initialize beforeunload warning
+window.addEventListener('beforeunload', function(e) {
+    if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+    }
+});
+
 loadTheme();
+loadTextSize();
 loadFromLocalStorage();
+markAsSaved(); // Initialize as saved on load
 render();

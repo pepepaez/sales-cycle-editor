@@ -12,18 +12,32 @@
         <div class="header-content">
             <div class="title-block">
                 <h1>Sales Cycle Interactive Editor</h1>
-                <p class="subtitle">Tutorial Mode - Hover over activities to see how features work. Use Reset or Import to start fresh.</p>
+                <div class="filename-group" style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+                    <div class="filename-display" style="padding: 12px 20px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-card); color: var(--text); font-size: 20px; font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                        <span id="project-filename">Editor Tutorial.json</span>
+                    </div>
+                    <span id="unsaved-indicator" style="color: #ff6b6b; font-weight: 500; display: none; font-size: 18px;">●</span>
+                </div>
             </div>
             <div class="toolbar">
                 <button class="theme-toggle" onclick="toggleTheme()">
                     <span id="theme-icon">🌙</span>
                     <span id="theme-label">Dark</span>
                 </button>
+                <div class="text-size-control" style="display: flex; align-items: center; gap: 8px;">
+                    <label style="font-size: 14px; color: var(--text-muted);">Text Size:</label>
+                    <select id="text-size-selector" onchange="changeTextSize()" style="padding: 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--input-bg); color: var(--text); font-size: 14px;">
+                        <option value="12">Small</option>
+                        <option value="14" selected>Medium</option>
+                        <option value="16">Large</option>
+                        <option value="18">X-Large</option>
+                    </select>
+                </div>
                 <button class="btn" onclick="openStagesModal()">Stages</button>
-                <button class="btn" onclick="exportJSON()">Export</button>
+                <button class="btn primary" onclick="saveToLocalStorage()">Save</button>
+                <button class="btn primary" onclick="exportJSON()">Save As</button>
                 <input type="file" id="file-input" class="file-input" accept=".json" onchange="importJSON(event)">
                 <button class="btn" onclick="document.getElementById('file-input').click()">Import</button>
-                <button class="btn primary" onclick="saveToLocalStorage()">Save</button>
                 <button class="btn danger" onclick="resetToDefault()">Reset</button>
             </div>
         </div>

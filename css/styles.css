@@ -7,6 +7,7 @@
             --text-primary: #e6edf3;
             --text-secondary: #8b949e;
             --text-muted: #6e7681;
+            --chart-text-size: 14px;
             --ae-color: #f0883e;
             --ae-bg: rgba(240, 136, 62, 0.25);
             --ae-border: rgba(240, 136, 62, 0.6);
@@ -123,15 +124,17 @@
         .legend-gate { width: 12px; height: 12px; background: var(--gate-color); transform: rotate(45deg); border-radius: 2px; }
         .legend-icon { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; }
         .legend-icon.deliverable { background: var(--deliverable-color); color: var(--bg-primary); border-radius: 50%; }
-        .gantt-wrapper { background: var(--bg-secondary); border-radius: 10px; border: 1px solid var(--border); overflow: visible; }
-        .gantt-inner { min-width: 1200px; }
+        .gantt-wrapper { background: var(--bg-secondary); border-radius: 10px; border: 1px solid var(--border); overflow: auto; position: relative; height: calc(100vh - 130px); }
+        .gantt-inner { min-width: 1200px; overflow: visible; }
         .stage-headers {
             display: grid;
             border-bottom: 2px solid var(--border);
             background: var(--bg-card);
+            position: -webkit-sticky;
             position: sticky;
-            top: 73px;
-            z-index: 20;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         .header-spacer { padding: 10px 12px; border-right: 1px solid var(--border); display: flex; align-items: center; font-weight: 600; font-size: 12px; color: var(--text-muted); }
         .stage-header { padding: 8px 12px; border-right: 1px solid var(--border); position: relative; text-align: center; min-width: 120px; }
@@ -148,7 +151,7 @@
         .swimlane { border-bottom: 1px solid var(--border); }
         .swimlane:last-child { border-bottom: none; }
         .swimlane-header { display: grid; background: var(--bg-card); border-bottom: 1px solid var(--border); }
-        .swimlane-label { padding: 8px 12px; font-weight: 600; font-size: 13px; display: flex; align-items: center; justify-content: space-between; gap: 8px; border-right: 1px solid var(--border); }
+        .swimlane-label { padding: 8px 12px; font-weight: 600; font-size: var(--chart-text-size); display: flex; align-items: center; justify-content: space-between; gap: 8px; border-right: 1px solid var(--border); }
         .swimlane-label-text { display: flex; align-items: center; gap: 8px; }
         .swimlane-label.ae { color: var(--ae-color); }
         .swimlane-label.ss { color: var(--ss-color); }
@@ -177,7 +180,7 @@
         .section-header:hover { background: var(--bg-card); }
         .section-header.dragging { opacity: 0.5; }
         .section-header.drag-over { border-top: 2px solid var(--ss-color); }
-        .section-label { padding: 6px 12px 6px 24px; font-weight: 500; font-size: 12px; color: var(--text-secondary); border-right: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+        .section-label { padding: 6px 12px 6px 24px; font-weight: 500; font-size: var(--chart-text-size); color: var(--text-secondary); border-right: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
         .section-collapse { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--text-muted); transition: transform 0.2s; }
         .section-collapse.collapsed { transform: rotate(-90deg); }
         .section-drag-handle { color: var(--text-muted); cursor: grab; font-size: 12px; }
@@ -214,9 +217,6 @@
             min-width: 0;
         }
         
-        .gantt-inner {
-            min-width: 100%;
-        }
         
         .chart-resize-container {
             display: flex;
@@ -225,10 +225,10 @@
         
         .slide-panel {
             position: fixed;
-            top: 0;
+            top: 75px;
             right: 0;
             width: var(--panel-width, 380px);
-            height: 100vh;
+            height: calc(100vh - 75px);
             background: var(--bg-card);
             box-shadow: -4px 0 20px rgba(0,0,0,0.2);
             z-index: 201;
@@ -322,9 +322,9 @@
             justify-content: space-between;
             flex-shrink: 0;
         }
-        .activity-label { padding: 6px 10px 6px 40px; font-size: 13px; color: var(--text-primary); border-right: 1px solid var(--border); display: flex; align-items: flex-start; gap: 6px; }
+        .activity-label { padding: 6px 10px 6px 40px; font-size: var(--chart-text-size); color: var(--text-primary); border-right: 1px solid var(--border); display: flex; align-items: flex-start; gap: 6px; }
         .activity-drag-handle { color: var(--text-muted); cursor: grab; font-size: 11px; margin-top: 3px; }
-        .activity-name { flex: 1; font-size: 13px; line-height: 1.4; padding: 2px 0; min-width: 0; word-wrap: break-word; cursor: pointer; }
+        .activity-name { flex: 1; font-size: var(--chart-text-size); line-height: 1.4; padding: 2px 0; min-width: 0; word-wrap: break-word; cursor: pointer; }
         .activity-name:hover { color: var(--ss-color); }
         .activity-badges { display: flex; gap: 3px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; max-width: 80px; margin-top: 2px; }
         .badge { width: 18px; height: 18px; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; cursor: pointer; transition: transform 0.1s; flex-shrink: 0; }
