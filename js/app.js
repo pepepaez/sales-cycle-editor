@@ -2,7 +2,7 @@
 let currentSwimlane = null, currentSection = null, currentActivity = null, editMode = false;
 let editSectionMode = false, currentEditSection = null;
 let editingStageId = null, selectedStageColor = null;
-let dragState = null, draggedSection = null, draggedActivity = null;
+let dragState = null, draggedSection = null, draggedActivity = null, draggedSwimlane = null;
 let isDarkMode = true;
 let hasUnsavedChanges = false;
 let lastSavedState = null;
@@ -141,9 +141,17 @@ function loadTextSize() {
 
 function findActivityById(id) {
     for (const sl of ganttData.swimlanes) {
-        for (const sec of sl.sections) {
-            const act = sec.activities.find(a => a.id === id);
-            if (act) return { activity: act, section: sec, swimlane: sl };
+        // Check swimlane-level activities first
+        if (sl.activities) {
+            const act = sl.activities.find(a => a.id === id);
+            if (act) return { activity: act, section: null, swimlane: sl };
+        }
+        // Check section activities
+        if (sl.sections) {
+            for (const sec of sl.sections) {
+                const act = sec.activities.find(a => a.id === id);
+                if (act) return { activity: act, section: sec, swimlane: sl };
+            }
         }
     }
     return null;
@@ -152,13 +160,24 @@ function findActivityById(id) {
 function getSuccessors(activityId) {
     const successors = [];
     ganttData.swimlanes.forEach(sl => {
-        sl.sections.forEach(sec => {
-            sec.activities.forEach(act => {
-                const hasPredecessor = act.predecessor === activityId || 
+        // Check swimlane-level activities
+        if (sl.activities) {
+            sl.activities.forEach(act => {
+                const hasPredecessor = act.predecessor === activityId ||
                     (Array.isArray(act.predecessors) && act.predecessors.includes(activityId));
-                if (hasPredecessor) successors.push({ activity: act, section: sec, swimlane: sl });
+                if (hasPredecessor) successors.push({ activity: act, section: null, swimlane: sl });
             });
-        });
+        }
+        // Check section activities
+        if (sl.sections) {
+            sl.sections.forEach(sec => {
+                sec.activities.forEach(act => {
+                    const hasPredecessor = act.predecessor === activityId ||
+                        (Array.isArray(act.predecessors) && act.predecessors.includes(activityId));
+                    if (hasPredecessor) successors.push({ activity: act, section: sec, swimlane: sl });
+                });
+            });
+        }
     });
     return successors;
 }
@@ -201,32 +220,32 @@ function render() {
     attachDragListeners();
     attachTooltipListeners();
     attachReorderListeners();
+    attachColumnResizeListeners();
 }
 
 function renderLegend() {
     const container = document.getElementById('legend');
     let html = '';
-    
-    // Add swimlane colors
-    ganttData.swimlanes.forEach(sl => {
-        html += `<div class="legend-item"><div class="legend-bar" style="background:${sl.color}"></div>${sl.name}</div>`;
-    });
-    
-    // Add shared indicator
-    html += `<div class="legend-item"><div class="legend-bar" style="background:var(--shared-color)"></div>Shared</div>`;
-    
+
+    // Add actors with their bright colors
+    if (ganttData.actors && ganttData.actors.length > 0) {
+        ganttData.actors.forEach(actor => {
+            html += `<div class="legend-item"><div class="legend-bar" style="background:${actor.color}"></div>${actor.name}</div>`;
+        });
+    }
+
     // Add exit gate
     html += `<div class="legend-item"><div class="legend-gate"></div>Exit Gate</div>`;
-    
+
     // Add deliverable
     html += `<div class="legend-item"><div class="legend-icon deliverable">D</div>Deliverable</div>`;
-    
+
     container.innerHTML = html;
 }
 
 function renderStageHeaders() {
     const container = document.getElementById('stage-headers');
-    let html = '<div class="header-spacer">ACTIVITIES</div>';
+    let html = '<div class="header-spacer" style="position:relative;">ACTIVITIES<div class="column-resize-handle" title="Drag to resize activity column"></div></div>';
     ganttData.stages.forEach((stage, i) => {
         const stageNum = stage.num !== undefined ? stage.num : (i + 1);
         html += `<div class="stage-header" data-stage-id="${stage.id}">
@@ -245,25 +264,35 @@ function renderSwimlanes() {
     container.innerHTML = '';
     const stageCount = ganttData.stages.length;
     const stageCols = `repeat(${stageCount}, 1fr)`;
-    
+
     ganttData.swimlanes.forEach(sl => {
         const el = document.createElement('div');
         el.className = 'swimlane';
         el.dataset.swimlaneId = sl.id;
-        
-        let sectionsHtml = sl.collapsed ? '' : sl.sections.map(sec => renderSection(sl, sec, stageCols)).join('');
-        
+
+        // Render swimlane-level activities (no section)
+        let swimlaneActivitiesHtml = '';
+        if (!sl.collapsed && sl.activities && sl.activities.length > 0) {
+            swimlaneActivitiesHtml = sl.activities.map(act => renderActivityRow(sl, null, act, stageCols)).join('');
+        }
+
+        // Render sections and their activities
+        let sectionsHtml = sl.collapsed ? '' : (sl.sections || []).map(sec => renderSection(sl, sec, stageCols)).join('');
+
         let dividers = '';
         for (let i = 0; i < stageCount; i++) dividers += '<div class="stage-divider"></div>';
-        
-        const totalActivities = sl.sections.reduce((sum, sec) => sum + sec.activities.length, 0);
+
+        const swimlaneActivityCount = sl.activities ? sl.activities.length : 0;
+        const sectionActivityCount = (sl.sections || []).reduce((sum, sec) => sum + sec.activities.length, 0);
+        const totalActivities = swimlaneActivityCount + sectionActivityCount;
         const slColor = sl.color || '#58a6ff';
-        
+
         el.innerHTML = `
-            <div class="swimlane-header" style="grid-template-columns: ${ACTIVITY_COL_WIDTH}px 1fr;">
-                <div class="swimlane-label" style="color: ${slColor};">
+            <div class="swimlane-header" style="grid-template-columns: ${ACTIVITY_COL_WIDTH}px 1fr;" data-swimlane-id="${sl.id}">
+                <div class="swimlane-label" style="color: ${slColor};position:relative;">
+                    <span class="swimlane-drag-handle" draggable="true" data-swimlane-id="${sl.id}" style="cursor:move;margin-right:6px;opacity:0.5;" title="Drag to reorder">⋮⋮</span>
                     <div class="swimlane-label-text" onclick="toggleSwimlaneCollapse('${sl.id}')" style="cursor:pointer;">
-                        <span class="swimlane-collapse ${sl.collapsed ? 'collapsed' : ''}">▼</span>
+                        <span class="swimlane-collapse ${sl.collapsed ? 'collapsed' : ''}">▸</span>
                         <div class="swimlane-dot" style="background: ${slColor};"></div>
                         <span>${sl.name}</span>
                         <span class="swimlane-count">${totalActivities}</span>
@@ -274,14 +303,18 @@ function renderSwimlanes() {
                         <button class="add-btn" onclick="openEditSwimlaneModal('${sl.id}')" title="Edit">✎</button>
                         <button class="add-btn" onclick="deleteSwimlane('${sl.id}')" title="Delete" ${ganttData.swimlanes.length <= 1 ? 'disabled style="opacity:0.4;"' : ''}>✕</button>
                     </div>
+                    <div class="column-resize-handle" title="Drag to resize activity column"></div>
                 </div>
                 <div class="stage-dividers" style="grid-template-columns: ${stageCols};">${dividers}</div>
             </div>
-            <div class="swimlane-content ${sl.collapsed ? 'collapsed' : ''}">${sectionsHtml}</div>
+            <div class="swimlane-content ${sl.collapsed ? 'collapsed' : ''}">
+                ${swimlaneActivitiesHtml}
+                ${sectionsHtml}
+            </div>
         `;
         container.appendChild(el);
     });
-    
+
     // Add "Add Swimlane" button at the end
     const addBtn = document.createElement('div');
     addBtn.className = 'add-swimlane-row';
@@ -303,8 +336,8 @@ function renderSection(sl, sec, stageCols) {
         <div class="section-group" data-section-id="${sec.id}" data-swimlane-id="${sl.id}">
             <div class="section-header" data-section-id="${sec.id}" data-swimlane-id="${sl.id}" style="grid-template-columns: ${ACTIVITY_COL_WIDTH}px 1fr;">
                 <div class="section-label" onclick="toggleSectionCollapse('${sl.id}', '${sec.id}')">
-                    <span class="section-collapse ${sec.collapsed ? 'collapsed' : ''}">▼</span>
                     <span class="section-drag-handle" draggable="true" data-section-id="${sec.id}" data-swimlane-id="${sl.id}">☰</span>
+                    <span class="section-collapse ${sec.collapsed ? 'collapsed' : ''}">▸</span>
                     <span class="section-name">${sec.name}</span>
                     <span class="section-count">${actCount}</span>
                     <div class="section-actions">
@@ -324,48 +357,108 @@ function renderSection(sl, sec, stageCols) {
 
 function renderActivityRow(sl, sec, act, stageCols) {
     const stageCount = ganttData.stages.length;
-    const slColor = sl.color || '#58a6ff';
-    const isSharedActivity = act.isShared && act.sharedWith && act.sharedWith.length > 0;
-    const sharedLabel = isSharedActivity ? act.sharedWith.map(s => s.toUpperCase().substring(0, 2)).join('+') : '';
-    
+
     let stageBgs = '';
     const stageWidth = 100 / stageCount;
     for (let i = 0; i < stageCount; i++) {
         stageBgs += `<div class="stage-bg" style="left:${i * stageWidth}%;width:${stageWidth}%;${i === stageCount - 1 ? 'border-right:none;' : ''}"></div>`;
     }
-    
-    // Use purple for shared activities, otherwise use swimlane color
-    const barColor = isSharedActivity ? '#a371f7' : slColor;
-    const barBg = isSharedActivity ? 'rgba(163, 113, 247, 0.25)' : hexToRgba(slColor, 0.25);
-    const barBorder = isSharedActivity ? 'rgba(163, 113, 247, 0.6)' : hexToRgba(slColor, 0.6);
-    
+
+    // Use swimlane color for activity bars
+    const slColor = sl.color || '#FFE5E5';
+    const barBg = hexToRgba(slColor, 0.4);
+    const barBorder = hexToRgba(slColor, 0.8);
+
+    const secId = sec ? sec.id : null;
+
     let barHtml;
     if (act.isGate) {
-        barHtml = `<div class="bar exit-gate" style="left:calc(${act.start}% - 11px);" data-swimlane="${sl.id}" data-section="${sec.id}" data-activity="${act.id}"><span class="gate-label">G</span></div>`;
+        // Gate bars use gate owner's color and initials
+        let gateColor = slColor;
+        let gateLabel = 'G';
+        if (act.gateOwner && ganttData.actors) {
+            const owner = ganttData.actors.find(a => a.id === act.gateOwner);
+            if (owner) {
+                gateColor = owner.color;
+                // Get initials (max 2 letters)
+                const words = owner.name.trim().split(/\s+/);
+                if (words.length === 1) {
+                    gateLabel = words[0].substring(0, 2).toUpperCase();
+                } else {
+                    gateLabel = words.slice(0, 2).map(w => w[0]).join('').toUpperCase();
+                }
+            }
+        }
+        barHtml = `<div class="bar exit-gate" style="left:calc(${act.start}% - 11px);background:${gateColor};border:2px solid rgba(255,255,255,0.6);box-shadow:0 1px 2px rgba(0,0,0,0.2);" data-swimlane="${sl.id}" data-section="${secId}" data-activity="${act.id}"><span class="gate-label" style="color:white;">${gateLabel}</span></div>`;
     } else {
         const width = act.end - act.start;
+
+        // Build RACI indicator boxes on the bar
+        let raciBoxes = '';
+
+        // Helper function to get actor initials
+        const getInitials = (name) => {
+            const words = name.trim().split(/\s+/);
+            if (words.length === 1) return words[0].substring(0, 2).toUpperCase();
+            return words.slice(0, 2).map(w => w[0]).join('').toUpperCase();
+        };
+
+        // Accountable - show first with distinct styling
+        if (act.accountable && ganttData.actors) {
+            const accActor = ganttData.actors.find(a => a.id === act.accountable);
+            if (accActor) {
+                const initials = getInitials(accActor.name);
+                const textColor = getContrastingTextColor(accActor.color);
+                raciBoxes += `<div class="raci-box accountable" style="background:${accActor.color};color:${textColor};" title="Accountable: ${accActor.name}">${initials}</div>`;
+            }
+        }
+
+        // Responsible - show as small squares
+        if (act.responsible && act.responsible.length > 0 && ganttData.actors) {
+            act.responsible.forEach(rId => {
+                const rActor = ganttData.actors.find(a => a.id === rId);
+                if (rActor) {
+                    const initials = getInitials(rActor.name);
+                    const textColor = getContrastingTextColor(rActor.color);
+                    raciBoxes += `<div class="raci-box responsible" style="background:${rActor.color};color:${textColor};" title="Responsible: ${rActor.name}">${initials}</div>`;
+                }
+            });
+        }
+
+        // Other indicators (deliverable, dependencies, friction, notes)
         let indicators = '';
         if (act.isDeliverable) indicators += '<div class="bar-indicator deliverable">D</div>';
         const actPreds = (Array.isArray(act.predecessors) && act.predecessors.length > 0) || act.predecessor;
         if (actPreds || getSuccessors(act.id).length > 0) indicators += '<div class="bar-indicator dependency">⇆</div>';
         if (hasFriction(act)) indicators += '<div class="bar-indicator friction">⚠</div>';
         if (hasNotes(act)) indicators += '<div class="bar-indicator notes">📝</div>';
-        barHtml = `<div class="bar" style="left:${act.start}%;width:${width}%;background:${barBg};border:1.5px solid ${barBorder};color:${barColor};" data-swimlane="${sl.id}" data-section="${sec.id}" data-activity="${act.id}"><div class="resize-handle left" data-handle="left"></div><div class="resize-handle right" data-handle="right"></div>${indicators ? `<div class="bar-indicators">${indicators}</div>` : ''}</div>`;
+
+        barHtml = `<div class="bar" style="left:${act.start}%;width:${width}%;background:${barBg};border:1.5px solid ${barBorder};" data-swimlane="${sl.id}" data-section="${secId}" data-activity="${act.id}">
+            <div class="resize-handle left" data-handle="left"></div>
+            <div class="resize-handle right" data-handle="right"></div>
+            ${raciBoxes ? `<div class="raci-boxes">${raciBoxes}</div>` : ''}
+            ${indicators ? `<div class="bar-indicators">${indicators}</div>` : ''}
+        </div>`;
     }
-    
+
+    // No badges needed since we show RACI on the bars
+    let raciBadges = '';
+
     return `
-        <div class="activity-row" draggable="true" data-activity-id="${act.id}" data-section-id="${sec.id}" data-swimlane-id="${sl.id}" style="grid-template-columns: ${ACTIVITY_COL_WIDTH}px 1fr;">
+        <div class="activity-row" draggable="true" data-activity-id="${act.id}" data-section-id="${secId}" data-swimlane-id="${sl.id}" style="grid-template-columns: ${ACTIVITY_COL_WIDTH}px 1fr;">
             <div class="activity-label">
                 <span class="activity-drag-handle">⋮⋮</span>
-                <div class="activity-name" onclick="openSlidePanel('${sl.id}','${sec.id}','${act.id}')">${act.name}</div>
+                <div class="activity-name" onclick="openSlidePanel('${sl.id}',${secId === null ? 'null' : `'${secId}'`},'${act.id}')">${act.name}</div>
                 <div class="activity-badges">
-                    <div class="badge gate ${act.isGate ? '' : 'inactive'}" onclick="toggleGateProp('${sl.id}','${sec.id}','${act.id}')" title="Exit Gate">G</div>
-                    <div class="badge deliverable ${act.isDeliverable ? '' : 'inactive'}" onclick="toggleDeliverableProp('${sl.id}','${sec.id}','${act.id}')" title="Deliverable">D</div>
-                    ${isSharedActivity ? `<div class="badge shared-badge">${sharedLabel || 'S'}</div>` : ''}
+                    <div class="badge deliverable ${act.isDeliverable ? '' : 'inactive'}" onclick="toggleDeliverableProp('${sl.id}',${secId === null ? 'null' : `'${secId}'`},'${act.id}')" title="Deliverable">D</div>
+                    <div class="badge gate ${act.isGate ? '' : 'inactive'}" onclick="toggleGateProp('${sl.id}',${secId === null ? 'null' : `'${secId}'`},'${act.id}')" title="Exit Gate">G</div>
+                    <div class="badge friction ${hasFriction(act) ? '' : 'inactive'}" title="Friction Point">⚠</div>
+                    <div class="badge notes ${hasNotes(act) ? '' : 'inactive'}" title="Notes">📝</div>
+                    ${raciBadges}
                 </div>
                 <div class="activity-actions">
-                    <button class="action-btn" onclick="openSlidePanel('${sl.id}','${sec.id}','${act.id}')" title="Edit">✎</button>
-                    <button class="action-btn delete" onclick="deleteActivity('${sl.id}','${sec.id}','${act.id}')" title="Delete">✕</button>
+                    <button class="action-btn" onclick="openSlidePanel('${sl.id}',${secId === null ? 'null' : `'${secId}'`},'${act.id}')" title="Edit">✎</button>
+                    <button class="action-btn delete" onclick="deleteActivity('${sl.id}',${secId === null ? 'null' : `'${secId}'`},'${act.id}')" title="Delete">✕</button>
                 </div>
             </div>
             <div class="activity-chart" data-activity-id="${act.id}">${stageBgs}${barHtml}</div>
@@ -380,6 +473,26 @@ function hexToRgba(hex, alpha) {
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+// Calculate relative luminance and return appropriate text color (white or black)
+function getContrastingTextColor(hexColor) {
+    // Convert hex to RGB
+    const r = parseInt(hexColor.slice(1, 3), 16) / 255;
+    const g = parseInt(hexColor.slice(3, 5), 16) / 255;
+    const b = parseInt(hexColor.slice(5, 7), 16) / 255;
+
+    // Apply gamma correction
+    const rLinear = r <= 0.03928 ? r / 12.92 : Math.pow((r + 0.055) / 1.055, 2.4);
+    const gLinear = g <= 0.03928 ? g / 12.92 : Math.pow((g + 0.055) / 1.055, 2.4);
+    const bLinear = b <= 0.03928 ? b / 12.92 : Math.pow((b + 0.055) / 1.055, 2.4);
+
+    // Calculate relative luminance (ITU-R BT.709)
+    const luminance = 0.2126 * rLinear + 0.7152 * gLinear + 0.0722 * bLinear;
+
+    // Return black for light backgrounds, white for dark backgrounds
+    // Threshold of 0.5 works well for most cases
+    return luminance > 0.5 ? '#000000' : '#FFFFFF';
+}
+
 function toggleSectionCollapse(slId, secId) {
     const sl = ganttData.swimlanes.find(s => s.id === slId);
     if (!sl) return;
@@ -391,6 +504,50 @@ function toggleSectionCollapse(slId, secId) {
 }
 
 function attachReorderListeners() {
+    // Swimlane drag and drop
+    document.querySelectorAll('.swimlane-drag-handle[draggable="true"]').forEach(el => {
+        el.addEventListener('dragstart', e => {
+            e.stopPropagation();
+            draggedSwimlane = el.dataset.swimlaneId;
+            el.closest('.swimlane').classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        });
+        el.addEventListener('dragend', e => {
+            el.closest('.swimlane').classList.remove('dragging');
+            document.querySelectorAll('.swimlane').forEach(x => x.classList.remove('drag-over'));
+            draggedSwimlane = null;
+        });
+    });
+
+    document.querySelectorAll('.swimlane').forEach(el => {
+        el.addEventListener('dragover', e => {
+            e.preventDefault();
+            if (!draggedSwimlane || el.dataset.swimlaneId === draggedSwimlane) return;
+            el.classList.add('drag-over');
+        });
+        el.addEventListener('dragleave', e => {
+            e.classList.remove('drag-over');
+        });
+        el.addEventListener('drop', e => {
+            e.preventDefault();
+            if (!draggedSwimlane) return;
+            const targetId = el.dataset.swimlaneId;
+            if (targetId === draggedSwimlane) return;
+
+            const fromIndex = ganttData.swimlanes.findIndex(s => s.id === draggedSwimlane);
+            const toIndex = ganttData.swimlanes.findIndex(s => s.id === targetId);
+
+            if (fromIndex === -1 || toIndex === -1) return;
+
+            // Move swimlane
+            const [movedSwimlane] = ganttData.swimlanes.splice(fromIndex, 1);
+            ganttData.swimlanes.splice(toIndex, 0, movedSwimlane);
+
+            markAsChanged();
+            render();
+        });
+    });
+
     document.querySelectorAll('.section-drag-handle[draggable="true"]').forEach(el => {
         el.addEventListener('dragstart', e => {
             e.stopPropagation();
@@ -407,7 +564,7 @@ function attachReorderListeners() {
     document.querySelectorAll('.section-header').forEach(el => {
         el.addEventListener('dragover', e => {
             e.preventDefault();
-            if (!draggedSection || el.dataset.swimlaneId !== draggedSection.swimlaneId || el.dataset.sectionId === draggedSection.sectionId) return;
+            if (!draggedSection || el.dataset.sectionId === draggedSection.sectionId) return;
             el.classList.add('drag-over');
         });
         el.addEventListener('dragleave', e => el.classList.remove('drag-over'));
@@ -415,14 +572,25 @@ function attachReorderListeners() {
             e.preventDefault();
             if (!draggedSection) return;
             const tsl = el.dataset.swimlaneId, tsec = el.dataset.sectionId;
-            if (tsl !== draggedSection.swimlaneId || tsec === draggedSection.sectionId) return;
-            const sl = ganttData.swimlanes.find(s => s.id === tsl);
-            if (!sl) return;
-            const fi = sl.sections.findIndex(s => s.id === draggedSection.sectionId);
-            const ti = sl.sections.findIndex(s => s.id === tsec);
-            if (fi === -1 || ti === -1) return;
-            const [rem] = sl.sections.splice(fi, 1);
-            sl.sections.splice(ti, 0, rem);
+            if (tsec === draggedSection.sectionId) return;
+
+            // Find source swimlane and remove section
+            const sourceSwimlane = ganttData.swimlanes.find(s => s.id === draggedSection.swimlaneId);
+            if (!sourceSwimlane) return;
+            const fi = sourceSwimlane.sections.findIndex(s => s.id === draggedSection.sectionId);
+            if (fi === -1) return;
+            const [movedSection] = sourceSwimlane.sections.splice(fi, 1);
+
+            // Find target swimlane and insert section
+            const targetSwimlane = ganttData.swimlanes.find(s => s.id === tsl);
+            if (!targetSwimlane) return;
+            const ti = targetSwimlane.sections.findIndex(s => s.id === tsec);
+            if (ti === -1) {
+                targetSwimlane.sections.push(movedSection);
+            } else {
+                targetSwimlane.sections.splice(ti, 0, movedSection);
+            }
+
             markAsChanged();
             render();
         });
@@ -443,7 +611,7 @@ function attachReorderListeners() {
         });
         el.addEventListener('dragover', e => {
             e.preventDefault();
-            if (!draggedActivity || el.dataset.swimlaneId !== draggedActivity.swimlaneId || el.dataset.activityId === draggedActivity.activityId) return;
+            if (!draggedActivity || el.dataset.activityId === draggedActivity.activityId) return;
             el.classList.add('drag-over');
         });
         el.addEventListener('dragleave', e => el.classList.remove('drag-over'));
@@ -451,29 +619,61 @@ function attachReorderListeners() {
             e.preventDefault();
             if (!draggedActivity) return;
             const tsl = el.dataset.swimlaneId, tsec = el.dataset.sectionId, tact = el.dataset.activityId;
-            if (tsl !== draggedActivity.swimlaneId || tact === draggedActivity.activityId) return;
-            const sl = ganttData.swimlanes.find(s => s.id === tsl);
-            if (!sl) return;
+            if (tact === draggedActivity.activityId) return;
+
+            // Find and remove the activity from its current location (source swimlane)
             let moved = null;
-            for (const sec of sl.sections) {
-                const idx = sec.activities.findIndex(a => a.id === draggedActivity.activityId);
-                if (idx !== -1) { [moved] = sec.activities.splice(idx, 1); break; }
+            const sourceSwimlane = ganttData.swimlanes.find(s => s.id === draggedActivity.swimlaneId);
+            if (!sourceSwimlane) return;
+
+            // Check swimlane-level activities first
+            if (sourceSwimlane.activities) {
+                const idx = sourceSwimlane.activities.findIndex(a => a.id === draggedActivity.activityId);
+                if (idx !== -1) {
+                    [moved] = sourceSwimlane.activities.splice(idx, 1);
+                }
             }
+
+            // If not found at swimlane level, check sections
+            if (!moved && sourceSwimlane.sections) {
+                for (const sec of sourceSwimlane.sections) {
+                    const idx = sec.activities.findIndex(a => a.id === draggedActivity.activityId);
+                    if (idx !== -1) {
+                        [moved] = sec.activities.splice(idx, 1);
+                        break;
+                    }
+                }
+            }
+
             if (!moved) return;
-            const tsecObj = sl.sections.find(s => s.id === tsec);
-            if (!tsecObj) return;
-            const ti = tsecObj.activities.findIndex(a => a.id === tact);
-            ti === -1 ? tsecObj.activities.push(moved) : tsecObj.activities.splice(ti, 0, moved);
+
+            // Add to target location (target swimlane)
+            const targetSwimlane = ganttData.swimlanes.find(s => s.id === tsl);
+            if (!targetSwimlane) return;
+
+            if (tsec === 'null' || tsec === null) {
+                // Drop to swimlane level
+                if (!targetSwimlane.activities) targetSwimlane.activities = [];
+                const ti = targetSwimlane.activities.findIndex(a => a.id === tact);
+                ti === -1 ? targetSwimlane.activities.push(moved) : targetSwimlane.activities.splice(ti, 0, moved);
+            } else {
+                // Drop to section
+                const tsecObj = targetSwimlane.sections.find(s => s.id === tsec);
+                if (!tsecObj) return;
+                const ti = tsecObj.activities.findIndex(a => a.id === tact);
+                ti === -1 ? tsecObj.activities.push(moved) : tsecObj.activities.splice(ti, 0, moved);
+            }
+
             markAsChanged();
             render();
         });
     });
     
-    // Empty lane drop targets for empty sections
-    document.querySelectorAll('.empty-lane[data-section-id]').forEach(el => {
+    // Empty lane drop targets for empty sections and swimlane-level
+    document.querySelectorAll('.empty-lane').forEach(el => {
         el.addEventListener('dragover', e => {
             e.preventDefault();
-            if (!draggedActivity || el.dataset.swimlaneId !== draggedActivity.swimlaneId) return;
+            if (!draggedActivity) return;
             el.classList.add('drag-over');
         });
         el.addEventListener('dragleave', e => el.classList.remove('drag-over'));
@@ -482,21 +682,88 @@ function attachReorderListeners() {
             el.classList.remove('drag-over');
             if (!draggedActivity) return;
             const tsl = el.dataset.swimlaneId, tsec = el.dataset.sectionId;
-            if (tsl !== draggedActivity.swimlaneId) return;
-            const sl = ganttData.swimlanes.find(s => s.id === tsl);
-            if (!sl) return;
+
+            // Find and remove the activity from its current location (source swimlane)
             let moved = null;
-            for (const sec of sl.sections) {
-                const idx = sec.activities.findIndex(a => a.id === draggedActivity.activityId);
-                if (idx !== -1) { [moved] = sec.activities.splice(idx, 1); break; }
+            const sourceSwimlane = ganttData.swimlanes.find(s => s.id === draggedActivity.swimlaneId);
+            if (!sourceSwimlane) return;
+
+            // Check swimlane-level activities first
+            if (sourceSwimlane.activities) {
+                const idx = sourceSwimlane.activities.findIndex(a => a.id === draggedActivity.activityId);
+                if (idx !== -1) {
+                    [moved] = sourceSwimlane.activities.splice(idx, 1);
+                }
             }
+
+            // If not found at swimlane level, check sections
+            if (!moved && sourceSwimlane.sections) {
+                for (const sec of sourceSwimlane.sections) {
+                    const idx = sec.activities.findIndex(a => a.id === draggedActivity.activityId);
+                    if (idx !== -1) {
+                        [moved] = sec.activities.splice(idx, 1);
+                        break;
+                    }
+                }
+            }
+
             if (!moved) return;
-            const tsecObj = sl.sections.find(s => s.id === tsec);
-            if (!tsecObj) return;
-            tsecObj.activities.push(moved);
+
+            // Add to target location (target swimlane)
+            const targetSwimlane = ganttData.swimlanes.find(s => s.id === tsl);
+            if (!targetSwimlane) return;
+
+            if (tsec === 'null' || tsec === null || tsec === undefined) {
+                // Drop to swimlane level
+                if (!targetSwimlane.activities) targetSwimlane.activities = [];
+                targetSwimlane.activities.push(moved);
+            } else {
+                // Drop to section
+                const tsecObj = targetSwimlane.sections.find(s => s.id === tsec);
+                if (!tsecObj) return;
+                tsecObj.activities.push(moved);
+            }
+
             markAsChanged();
             render();
         });
+    });
+}
+
+function attachColumnResizeListeners() {
+    let isResizing = false;
+    let startX = 0;
+    let startWidth = 0;
+
+    document.querySelectorAll('.column-resize-handle').forEach(handle => {
+        handle.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            isResizing = true;
+            startX = e.clientX;
+            startWidth = ACTIVITY_COL_WIDTH;
+            handle.classList.add('resizing');
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+        });
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+        e.preventDefault();
+        const delta = e.clientX - startX;
+        const newWidth = Math.max(200, Math.min(800, startWidth + delta)); // Min 200px, Max 800px
+        ACTIVITY_COL_WIDTH = newWidth;
+        updateGridTemplates();
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (isResizing) {
+            isResizing = false;
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+            document.querySelectorAll('.column-resize-handle').forEach(h => h.classList.remove('resizing'));
+        }
     });
 }
 
@@ -516,20 +783,57 @@ function showTooltip(e) {
     const succs = getSuccessors(actId);
     const stageIdx = Math.floor(act.start / getStageWidth());
     const stageName = ganttData.stages[Math.min(stageIdx, ganttData.stages.length - 1)]?.name || '';
-    
+
     // Highlight predecessors and successors
     highlightDependencies(actId, predIds, succs.map(s => s.activity.id));
-    
+
     let html = `<div class="tooltip-title">${act.name}</div>`;
-    html += `<div class="tooltip-row"><span class="tooltip-label">Owner:</span><span class="tooltip-value">${sl.name}</span></div>`;
-    html += `<div class="tooltip-row"><span class="tooltip-label">Section:</span><span class="tooltip-value">${sec.name}</span></div>`;
+    html += `<div class="tooltip-row"><span class="tooltip-label">Section:</span><span class="tooltip-value">${sl.name}</span></div>`;
+    if (sec) {
+        html += `<div class="tooltip-row"><span class="tooltip-label">Subsection:</span><span class="tooltip-value">${sec.name}</span></div>`;
+    } else {
+        html += `<div class="tooltip-row"><span class="tooltip-label">Subsection:</span><span class="tooltip-value" style="font-style:italic;opacity:0.7;">(No subsection)</span></div>`;
+    }
+
     if (act.isGate) {
         const gateStageIdx = getStageEnds().findIndex(end => Math.abs(end - act.start) < 1);
         const gateStage = ganttData.stages[gateStageIdx >= 0 ? gateStageIdx : ganttData.stages.length - 1];
         html += `<div class="tooltip-row"><span class="tooltip-label">Type:</span><span class="tooltip-value" style="color:var(--gate-color);">Exit Gate (${gateStage?.name || 'End'})</span></div>`;
+        if (act.gateOwner && ganttData.actors) {
+            const owner = ganttData.actors.find(a => a.id === act.gateOwner);
+            if (owner) {
+                html += `<div class="tooltip-row"><span class="tooltip-label">Gate Owner:</span><span class="tooltip-value" style="color:${owner.color};font-weight:600;">${owner.name}</span></div>`;
+            }
+        }
+    } else {
+        // Show RACI roles for regular activities
+        if (act.accountable && ganttData.actors) {
+            const accActor = ganttData.actors.find(a => a.id === act.accountable);
+            if (accActor) {
+                html += `<div class="tooltip-row"><span class="tooltip-label">Accountable:</span><span class="tooltip-value" style="color:${accActor.color};font-weight:600;">${accActor.name}</span></div>`;
+            }
+        }
+        if (act.responsible && act.responsible.length > 0 && ganttData.actors) {
+            const respActors = act.responsible.map(id => ganttData.actors.find(a => a.id === id)).filter(a => a);
+            if (respActors.length > 0) {
+                html += `<div class="tooltip-row"><span class="tooltip-label">Responsible:</span><span class="tooltip-value">${respActors.map(a => `<span style="color:${a.color};font-weight:600;">${a.name}</span>`).join(', ')}</span></div>`;
+            }
+        }
+        if (act.consulted && act.consulted.length > 0 && ganttData.actors) {
+            const consActors = act.consulted.map(id => ganttData.actors.find(a => a.id === id)).filter(a => a);
+            if (consActors.length > 0) {
+                html += `<div class="tooltip-row"><span class="tooltip-label">Consulted:</span><span class="tooltip-value">${consActors.map(a => `<span style="color:${a.color};font-weight:600;">${a.name}</span>`).join(', ')}</span></div>`;
+            }
+        }
+        if (act.informed && act.informed.length > 0 && ganttData.actors) {
+            const infActors = act.informed.map(id => ganttData.actors.find(a => a.id === id)).filter(a => a);
+            if (infActors.length > 0) {
+                html += `<div class="tooltip-row"><span class="tooltip-label">Informed:</span><span class="tooltip-value">${infActors.map(a => `<span style="color:${a.color};font-weight:600;">${a.name}</span>`).join(', ')}</span></div>`;
+            }
+        }
     }
+
     if (act.isDeliverable) html += `<div class="tooltip-row"><span class="tooltip-label">Deliverable:</span><span class="tooltip-value" style="color:var(--deliverable-color);">Yes</span></div>`;
-    if (act.isShared && act.sharedWith.length) html += `<div class="tooltip-row"><span class="tooltip-label">Shared:</span><span class="tooltip-value" style="color:var(--shared-color);">${act.sharedWith.map(s => s.toUpperCase()).join(', ')}</span></div>`;
     if (predInfos.length) html += `<div class="tooltip-row"><span class="tooltip-label">Predecessor${predInfos.length > 1 ? 's' : ''}:</span><span class="tooltip-value predecessor">← ${predInfos.map(p => p.activity.name).join(', ')}</span></div>`;
     if (succs.length) html += `<div class="tooltip-row"><span class="tooltip-label">Successor${succs.length > 1 ? 's' : ''}:</span><span class="tooltip-value successor">→ ${succs.map(s => s.activity.name).join(', ')}</span></div>`;
     if (act.friction?.trim()) html += `<div class="tooltip-section"><div class="tooltip-section-title">⚠ Friction</div><div class="tooltip-text">${act.friction}</div></div>`;
@@ -538,7 +842,7 @@ function showTooltip(e) {
     if (act.notes?.trim()) html += `<div class="tooltip-section"><div class="tooltip-section-title">📝 Notes</div><div class="tooltip-text">${act.notes}</div></div>`;
     tooltip.innerHTML = html;
     tooltip.classList.add('visible');
-    
+
     // Position tooltip at top right of bar
     positionTooltipAtBar(bar);
 }
@@ -624,19 +928,20 @@ function attachDragListeners() {
 function openBarEditPanel(e) {
     e.preventDefault();
     e.stopPropagation();
-    
+
     // If slide panel is already open, close it first without saving
     if (document.getElementById('slide-panel').classList.contains('open')) {
         closeSlidePanel(false); // Close without saving
     }
-    
+
     const bar = e.currentTarget;
     const actId = bar.dataset.activity;
     const result = findActivityById(actId);
-    
+
     if (result) {
         const { swimlane, section, activity } = result;
-        openSlidePanel(swimlane.id, section.id, actId);
+        const secId = section ? section.id : null;
+        openSlidePanel(swimlane.id, secId, actId);
     }
 }
 
@@ -727,7 +1032,14 @@ function endBarDrag() {
 function getActivity(slId, secId, actId) {
     const sl = ganttData.swimlanes.find(s => s.id === slId);
     if (!sl) return null;
-    const sec = sl.sections.find(s => s.id === secId);
+
+    // If secId is null, look in swimlane's direct activities
+    if (secId === null) {
+        return sl.activities?.find(a => a.id === actId);
+    }
+
+    // Otherwise look in section's activities
+    const sec = sl.sections?.find(s => s.id === secId);
     if (!sec) return null;
     return sec.activities.find(a => a.id === actId);
 }
@@ -757,10 +1069,44 @@ function deleteActivity(slId, secId, actId) {
     if (!confirm('Delete this activity?')) return;
     const sl = ganttData.swimlanes.find(s => s.id === slId);
     if (!sl) return;
-    const sec = sl.sections.find(s => s.id === secId);
-    if (!sec) return;
-    ganttData.swimlanes.forEach(s => s.sections.forEach(sc => sc.activities.forEach(a => { if (a.predecessor === actId) a.predecessor = null; })));
-    sec.activities = sec.activities.filter(a => a.id !== actId);
+
+    // Handle swimlane-level activities (no section)
+    if (secId === null) {
+        // Remove from swimlane's activities array
+        if (sl.activities) {
+            sl.activities = sl.activities.filter(a => a.id !== actId);
+        }
+    } else {
+        // Remove from section's activities array
+        const sec = sl.sections?.find(s => s.id === secId);
+        if (!sec) return;
+        sec.activities = sec.activities.filter(a => a.id !== actId);
+    }
+
+    // Remove this activity as predecessor from all other activities
+    ganttData.swimlanes.forEach(s => {
+        // Check swimlane-level activities
+        if (s.activities) {
+            s.activities.forEach(a => {
+                if (a.predecessor === actId) a.predecessor = null;
+                if (Array.isArray(a.predecessors)) {
+                    a.predecessors = a.predecessors.filter(p => p !== actId);
+                }
+            });
+        }
+        // Check section activities
+        if (s.sections) {
+            s.sections.forEach(sc => {
+                sc.activities.forEach(a => {
+                    if (a.predecessor === actId) a.predecessor = null;
+                    if (Array.isArray(a.predecessors)) {
+                        a.predecessors = a.predecessors.filter(p => p !== actId);
+                    }
+                });
+            });
+        }
+    });
+
     markAsChanged();
     render();
 }
@@ -781,7 +1127,30 @@ function deleteSection(slId, secId) {
 
 function getAllActivities() {
     const all = [];
-    ganttData.swimlanes.forEach(sl => sl.sections.forEach(sec => sec.activities.forEach(act => all.push({ ...act, sectionId: sec.id, sectionName: sec.name, swimlaneId: sl.id, swimlaneName: sl.name }))));
+    ganttData.swimlanes.forEach(sl => {
+        // Add swimlane-level activities (no section)
+        if (sl.activities) {
+            sl.activities.forEach(act => all.push({
+                ...act,
+                sectionId: null,
+                sectionName: '(No Section)',
+                swimlaneId: sl.id,
+                swimlaneName: sl.name
+            }));
+        }
+        // Add section activities
+        if (sl.sections) {
+            sl.sections.forEach(sec => {
+                sec.activities.forEach(act => all.push({
+                    ...act,
+                    sectionId: sec.id,
+                    sectionName: sec.name,
+                    swimlaneId: sl.id,
+                    swimlaneName: sl.name
+                }));
+            });
+        }
+    });
     return all;
 }
 
@@ -946,26 +1315,6 @@ function clearSuccessors() {
     renderSelectedSuccessors();
 }
 
-function toggleSharedWith() { document.getElementById('shared-with-section').classList.toggle('hidden', !document.getElementById('activity-shared').checked); }
-
-function populateSharedWithCheckboxes(currentSwimlaneId) {
-    const container = document.getElementById('shared-with-checkboxes');
-    const otherSwimlanes = ganttData.swimlanes.filter(sl => sl.id !== currentSwimlaneId);
-    container.innerHTML = otherSwimlanes.map(sl => 
-        `<label class="checkbox-item"><input type="checkbox" id="shared-${sl.id}" data-swimlane-id="${sl.id}"><span>${sl.name}</span></label>`
-    ).join('');
-}
-
-function getSelectedSharedWith() {
-    const checkboxes = document.querySelectorAll('#shared-with-checkboxes input[type="checkbox"]:checked');
-    return Array.from(checkboxes).map(cb => cb.dataset.swimlaneId);
-}
-
-function setSharedWithCheckboxes(sharedWithIds) {
-    document.querySelectorAll('#shared-with-checkboxes input[type="checkbox"]').forEach(cb => {
-        cb.checked = sharedWithIds.includes(cb.dataset.swimlaneId);
-    });
-}
 function toggleGateNote() { document.getElementById('gate-note').style.display = document.getElementById('activity-gate').checked ? 'block' : 'none'; }
 
 // Swimlane management
@@ -983,11 +1332,18 @@ function toggleSwimlaneCollapse(slId) {
 
 function renderSwimlaneColorPicker() {
     const container = document.getElementById('swimlane-color-picker');
-    container.innerHTML = STAGE_COLORS.map(color => `
-        <div class="color-option ${selectedSwimlaneColor === color ? 'selected' : ''}" 
-             style="background:${color};" 
+    // Use pastel colors for swimlanes
+    container.innerHTML = SWIMLANE_COLORS.map(color => `
+        <div class="color-option ${selectedSwimlaneColor === color ? 'selected' : ''}"
+             style="background:${color};"
              onclick="selectSwimlaneColor('${color}')"></div>
     `).join('');
+
+    // Sync color input
+    const colorInput = document.getElementById('swimlane-color-input');
+    if (colorInput && selectedSwimlaneColor) {
+        colorInput.value = selectedSwimlaneColor;
+    }
 }
 
 function selectSwimlaneColor(color) {
@@ -999,7 +1355,7 @@ function openAddSwimlaneModal() {
     editingSwimlaneId = null;
     document.getElementById('swimlane-modal-title').textContent = 'Add Swimlane';
     document.getElementById('swimlane-name').value = '';
-    selectedSwimlaneColor = STAGE_COLORS[0];
+    selectedSwimlaneColor = SWIMLANE_COLORS[0];
     renderSwimlaneColorPicker();
     document.getElementById('swimlane-modal').classList.add('visible');
 }
@@ -1010,7 +1366,7 @@ function openEditSwimlaneModal(slId) {
     if (!sl) return;
     document.getElementById('swimlane-modal-title').textContent = 'Edit Swimlane';
     document.getElementById('swimlane-name').value = sl.name;
-    selectedSwimlaneColor = sl.color || STAGE_COLORS[0];
+    selectedSwimlaneColor = sl.color || SWIMLANE_COLORS[0];
     renderSwimlaneColorPicker();
     document.getElementById('swimlane-modal').classList.add('visible');
 }
@@ -1100,63 +1456,87 @@ function confirmSection() {
     render();
 }
 
-// Activity Modal
+// Activity Modal - now using slide panel
 function openAddActivityModal(slId) {
-    currentSwimlane = slId; currentSection = null; currentActivity = null; editMode = false;
     const sl = ganttData.swimlanes.find(s => s.id === slId);
-    if (sl?.sections.length) currentSection = sl.sections[0].id;
-    document.getElementById('modal-title').textContent = 'Add Activity';
-    document.getElementById('modal-confirm-btn').textContent = 'Add';
-    document.getElementById('activity-name').value = '';
-    document.getElementById('activity-gate').checked = false;
-    document.getElementById('activity-deliverable').checked = false;
-    document.getElementById('activity-shared').checked = false;
-    populateSharedWithCheckboxes(slId);
-    document.getElementById('shared-with-section').classList.add('hidden');
-    document.getElementById('gate-note').style.display = 'none';
-    document.getElementById('activity-friction').value = '';
-    document.getElementById('activity-resolution').value = '';
-    document.getElementById('activity-deliverable-details').value = '';
-    document.getElementById('activity-notes').value = '';
-    
-    // Multi-select predecessor/successor
-    buildActivityCache(null);
-    selectedPredecessors = [];
-    selectedSuccessors = [];
-    document.getElementById('activity-predecessor-search').value = '';
-    document.getElementById('activity-successor-search').value = '';
-    renderSelectedPredecessors();
-    renderSelectedSuccessors();
-    
-    document.getElementById('activity-modal').classList.add('visible');
+    if (!sl) return;
+
+    // Create activity directly in swimlane (no section)
+    const newActId = `act_temp_${Date.now()}`;
+
+    // Ensure swimlane has activities array
+    if (!sl.activities) {
+        sl.activities = [];
+    }
+
+    // Create new activity with defaults
+    const newActivity = {
+        id: newActId,
+        name: 'New Activity',
+        start: 10,
+        end: 30,
+        isGate: false,
+        isDeliverable: false,
+        accountable: null,  // Don't set default - let user choose
+        responsible: [],
+        consulted: [],
+        informed: [],
+        predecessor: null,
+        predecessors: [],
+        friction: '',
+        resolution: '',
+        deliverableDetails: '',
+        notes: ''
+    };
+
+    // Add directly to swimlane
+    sl.activities.push(newActivity);
+    render();
+
+    // Open slide panel for editing (pass null for section)
+    openSlidePanel(slId, null, newActId);
+
+    // Mark as new
+    const slidePanel = document.getElementById('slide-panel');
+    slidePanel.dataset.isNew = 'true';
 }
 
 function openAddActivityToSectionModal(slId, secId) {
-    currentSwimlane = slId; currentSection = secId; currentActivity = null; editMode = false;
-    document.getElementById('modal-title').textContent = 'Add Activity';
-    document.getElementById('modal-confirm-btn').textContent = 'Add';
-    document.getElementById('activity-name').value = '';
-    document.getElementById('activity-gate').checked = false;
-    document.getElementById('activity-deliverable').checked = false;
-    document.getElementById('activity-shared').checked = false;
-    populateSharedWithCheckboxes(slId);
-    document.getElementById('shared-with-section').classList.add('hidden');
-    document.getElementById('gate-note').style.display = 'none';
-    document.getElementById('activity-friction').value = '';
-    document.getElementById('activity-resolution').value = '';
-    document.getElementById('activity-deliverable-details').value = '';
-    document.getElementById('activity-notes').value = '';
-    
-    // Multi-select predecessor/successor
-    buildActivityCache(null);
-    selectedPredecessors = [];
-    selectedSuccessors = [];
-    document.getElementById('activity-predecessor-search').value = '';
-    document.getElementById('activity-successor-search').value = '';
-    renderSelectedPredecessors();
-    renderSelectedSuccessors();
-    
-    document.getElementById('activity-modal').classList.add('visible');
+    // Create a new temporary activity
+    const newActId = `act_temp_${Date.now()}`;
+    const sec = ganttData.swimlanes.find(s => s.id === slId)?.sections.find(s => s.id === secId);
+    if (!sec) return;
+
+    // Create new activity with defaults
+    const newActivity = {
+        id: newActId,
+        name: 'New Activity',
+        start: 10,
+        end: 30,
+        isGate: false,
+        isDeliverable: false,
+        accountable: null,  // Don't set default - let user choose
+        responsible: [],
+        consulted: [],
+        informed: [],
+        predecessor: null,
+        predecessors: [],
+        friction: '',
+        resolution: '',
+        deliverableDetails: '',
+        notes: ''
+    };
+
+    // Add to section
+    sec.activities.push(newActivity);
+    render();
+
+    // Open slide panel for editing
+    openSlidePanel(slId, secId, newActId);
+
+    // Override the save button to handle first-time save
+    const slidePanel = document.getElementById('slide-panel');
+    slidePanel.dataset.isNew = 'true';
 }
 
 function openEditActivityModal(slId, secId, actId) {
@@ -1207,6 +1587,176 @@ function closeActivityModal() { document.getElementById('activity-modal').classL
 let slidePanelActivity = null;
 let slidePredecessors = [];
 let slideSuccessors = [];
+let slideAccountable = null;
+let slideResponsible = [];
+let slideConsulted = [];
+let slideInformed = [];
+let slideGateOwner = null;
+
+// Helper functions for RACI actor selection
+function populateActorDropdown(selectId, excludeIds = []) {
+    const select = document.getElementById(selectId);
+    if (!select) return;
+
+    // Keep first option (placeholder)
+    const firstOption = select.options[0];
+    select.innerHTML = '';
+    select.appendChild(firstOption);
+
+    if (!ganttData.actors) return;
+
+    ganttData.actors.forEach(actor => {
+        if (!excludeIds.includes(actor.id)) {
+            const option = document.createElement('option');
+            option.value = actor.id;
+            option.textContent = actor.name;
+            option.style.color = actor.color;
+            select.appendChild(option);
+        }
+    });
+}
+
+function renderActorBadge(actorId, role, onRemove) {
+    const actor = ganttData.actors?.find(a => a.id === actorId);
+    if (!actor) return '';
+    return `<div class="selected-tag" style="background:${actor.color};color:white;padding:4px 8px;border-radius:4px;font-size:12px;">
+        <span>${actor.name}</span>
+        <span class="tag-remove" onclick="${onRemove}" style="margin-left:6px;cursor:pointer;font-weight:bold;">×</span>
+    </div>`;
+}
+
+function onSlideAccountableChange() {
+    const select = document.getElementById('slide-accountable');
+    slideAccountable = select.value || null;
+}
+
+function onSlideResponsibleChange() {
+    const select = document.getElementById('slide-responsible');
+    if (select.value && !slideResponsible.includes(select.value)) {
+        slideResponsible.push(select.value);
+        renderSlideResponsibleList();
+        // Repopulate all R/C/I dropdowns to reflect the new selection
+        updateRACIDropdowns();
+    }
+    select.value = '';
+}
+
+function onSlideConsultedChange() {
+    const select = document.getElementById('slide-consulted');
+    if (select.value && !slideConsulted.includes(select.value)) {
+        slideConsulted.push(select.value);
+        renderSlideConsultedList();
+        // Repopulate all R/C/I dropdowns to reflect the new selection
+        updateRACIDropdowns();
+    }
+    select.value = '';
+}
+
+function onSlideInformedChange() {
+    const select = document.getElementById('slide-informed');
+    if (select.value && !slideInformed.includes(select.value)) {
+        slideInformed.push(select.value);
+        renderSlideInformedList();
+        // Repopulate all R/C/I dropdowns to reflect the new selection
+        updateRACIDropdowns();
+    }
+    select.value = '';
+}
+
+function onSlideGateOwnerChange() {
+    const select = document.getElementById('slide-gate-owner');
+    slideGateOwner = select.value || null;
+}
+
+function removeSlideResponsible(actorId) {
+    slideResponsible = slideResponsible.filter(id => id !== actorId);
+    renderSlideResponsibleList();
+    // Repopulate all R/C/I dropdowns to reflect the removal
+    updateRACIDropdowns();
+}
+
+function removeSlideConsulted(actorId) {
+    slideConsulted = slideConsulted.filter(id => id !== actorId);
+    renderSlideConsultedList();
+    // Repopulate all R/C/I dropdowns to reflect the removal
+    updateRACIDropdowns();
+}
+
+function removeSlideInformed(actorId) {
+    slideInformed = slideInformed.filter(id => id !== actorId);
+    renderSlideInformedList();
+    // Repopulate all R/C/I dropdowns to reflect the removal
+    updateRACIDropdowns();
+}
+
+// Update all R/C/I dropdowns with proper filtering
+// Rule: An actor can be in ONLY ONE of R, C, or I (mutually exclusive)
+// Exception: An actor CAN be both Accountable AND in R, C, or I
+function updateRACIDropdowns() {
+    // For Responsible dropdown: exclude actors already in R, C, or I
+    const excludeFromR = [...slideResponsible, ...slideConsulted, ...slideInformed];
+    populateActorDropdown('slide-responsible', excludeFromR);
+
+    // For Consulted dropdown: exclude actors already in C, R, or I
+    const excludeFromC = [...slideConsulted, ...slideResponsible, ...slideInformed];
+    populateActorDropdown('slide-consulted', excludeFromC);
+
+    // For Informed dropdown: exclude actors already in I, R, or C
+    const excludeFromI = [...slideInformed, ...slideResponsible, ...slideConsulted];
+    populateActorDropdown('slide-informed', excludeFromI);
+}
+
+function renderSlideResponsibleList() {
+    const container = document.getElementById('slide-responsible-list');
+    if (!container) return;
+    container.innerHTML = slideResponsible.map(actorId =>
+        renderActorBadge(actorId, 'R', `removeSlideResponsible('${actorId}')`)
+    ).join('');
+}
+
+function renderSlideConsultedList() {
+    const container = document.getElementById('slide-consulted-list');
+    if (!container) return;
+    container.innerHTML = slideConsulted.map(actorId =>
+        renderActorBadge(actorId, 'C', `removeSlideConsulted('${actorId}')`)
+    ).join('');
+}
+
+function renderSlideInformedList() {
+    const container = document.getElementById('slide-informed-list');
+    if (!container) return;
+    container.innerHTML = slideInformed.map(actorId =>
+        renderActorBadge(actorId, 'I', `removeSlideInformed('${actorId}')`)
+    ).join('');
+}
+
+function toggleSlideGateMode() {
+    const isGate = document.getElementById('slide-gate').checked;
+    document.getElementById('slide-raci-section').style.display = isGate ? 'none' : '';
+    document.getElementById('slide-gate-owner-section').style.display = isGate ? '' : 'none';
+
+    // Ensure dropdowns are populated when switching modes
+    if (isGate) {
+        populateActorDropdown('slide-gate-owner');
+        const gateOwnerSelect = document.getElementById('slide-gate-owner');
+        if (slideGateOwner) {
+            gateOwnerSelect.value = slideGateOwner;
+        } else {
+            gateOwnerSelect.selectedIndex = 0; // Select placeholder
+        }
+    } else {
+        populateActorDropdown('slide-accountable');
+        populateActorDropdown('slide-responsible');
+        populateActorDropdown('slide-consulted');
+        populateActorDropdown('slide-informed');
+        const accountableSelect = document.getElementById('slide-accountable');
+        if (slideAccountable) {
+            accountableSelect.value = slideAccountable;
+        } else {
+            accountableSelect.selectedIndex = 0; // Select placeholder
+        }
+    }
+}
 
 function openSlidePanel(slId, secId, actId) {
     // Auto-save previous activity if panel was already open
@@ -1215,32 +1765,59 @@ function openSlidePanel(slId, secId, actId) {
         saveSlidePanel(false); // Save without closing
         isAutoSaving = false; // Reset flag
     }
-    
+
     const act = getActivity(slId, secId, actId);
     if (!act) return;
-    
+
     slidePanelActivity = { slId, secId, actId };
-    
+
     // Populate fields
     document.getElementById('slide-panel-title').textContent = `Edit: ${act.name}`;
     document.getElementById('slide-name').value = act.name;
     document.getElementById('slide-gate').checked = act.isGate || false;
     document.getElementById('slide-deliverable').checked = act.isDeliverable || false;
-    document.getElementById('slide-shared').checked = act.isShared || false;
     document.getElementById('slide-friction').value = act.friction || '';
     document.getElementById('slide-resolution').value = act.resolution || '';
     document.getElementById('slide-deliverable-details').value = act.deliverableDetails || '';
     document.getElementById('slide-notes').value = act.notes || '';
-    
-    // Populate shared with checkboxes
-    const otherSwimlanes = ganttData.swimlanes.filter(s => s.id !== slId);
-    const sharedWithContainer = document.getElementById('slide-shared-checkboxes');
-    sharedWithContainer.innerHTML = otherSwimlanes.map(s => {
-        const checked = (act.sharedWith || []).includes(s.id) ? 'checked' : '';
-        return `<label class="checkbox-item"><input type="checkbox" data-swimlane-id="${s.id}" ${checked}><span>${s.name}</span></label>`;
-    }).join('');
-    
-    document.getElementById('slide-shared-with-section').style.display = act.isShared ? '' : 'none';
+
+    // Populate RACI actors for both gates and regular activities
+    if (act.isGate) {
+        slideGateOwner = act.gateOwner || null;
+    } else {
+        slideAccountable = act.accountable || null;
+        slideResponsible = [...(act.responsible || [])];
+        slideConsulted = [...(act.consulted || [])];
+        slideInformed = [...(act.informed || [])];
+    }
+
+    // Always populate all dropdowns (they'll be shown/hidden based on gate status)
+    populateActorDropdown('slide-accountable');
+    populateActorDropdown('slide-gate-owner');
+
+    if (act.isGate) {
+        const gateOwnerSelect = document.getElementById('slide-gate-owner');
+        if (slideGateOwner) {
+            gateOwnerSelect.value = slideGateOwner;
+        } else {
+            gateOwnerSelect.selectedIndex = 0; // Select placeholder
+        }
+    } else {
+        const accountableSelect = document.getElementById('slide-accountable');
+        if (slideAccountable) {
+            accountableSelect.value = slideAccountable;
+        } else {
+            accountableSelect.selectedIndex = 0; // Select placeholder
+        }
+        renderSlideResponsibleList();
+        renderSlideConsultedList();
+        renderSlideInformedList();
+        // Apply filtering to R/C/I dropdowns based on current selections
+        updateRACIDropdowns();
+    }
+
+    // Show/hide RACI vs Gate Owner sections
+    toggleSlideGateMode();
     
     // Initialize predecessors
     if (Array.isArray(act.predecessors) && act.predecessors.length > 0) {
@@ -1269,12 +1846,25 @@ function openSlidePanel(slId, secId, actId) {
     // Open panel and shrink chart
     document.body.classList.add('panel-open');
     document.getElementById('slide-panel').classList.add('open');
+
+    // Highlight the activity being edited
+    document.querySelectorAll('.activity-row').forEach(row => row.classList.remove('editing'));
+    const editingRow = document.querySelector(`.activity-row[data-activity-id="${actId}"]`);
+    if (editingRow) {
+        editingRow.classList.add('editing');
+        // Scroll the activity into view if needed
+        editingRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
 }
 
 function closeSlidePanel() {
     document.body.classList.remove('panel-open');
     const panel = document.getElementById('slide-panel');
     panel.classList.remove('open');
+
+    // Remove editing highlight from all activities
+    document.querySelectorAll('.activity-row').forEach(row => row.classList.remove('editing'));
+
     // Reset panel width to default after transition
     setTimeout(() => {
         if (!panel.classList.contains('open')) {
@@ -1285,6 +1875,11 @@ function closeSlidePanel() {
     slidePanelActivity = null;
     slidePredecessors = [];
     slideSuccessors = [];
+    slideAccountable = null;
+    slideResponsible = [];
+    slideConsulted = [];
+    slideInformed = [];
+    slideGateOwner = null;
 }
 
 // Escape key to close panel without saving
@@ -1329,10 +1924,7 @@ document.addEventListener('keydown', function(e) {
     });
 })();
 
-function toggleSlideSharedWith() {
-    const isShared = document.getElementById('slide-shared').checked;
-    document.getElementById('slide-shared-with-section').style.display = isShared ? '' : 'none';
-}
+// RACI functions removed - now using actor-based RACI model
 
 function saveSlidePanel(shouldClose = true) {
     if (!slidePanelActivity) return;
@@ -1346,33 +1938,28 @@ function saveSlidePanel(shouldClose = true) {
         name: act.name,
         isGate: act.isGate,
         isDeliverable: act.isDeliverable,
-        isShared: act.isShared,
+        accountable: act.accountable || null,
+        responsible: [...(act.responsible || [])],
+        consulted: [...(act.consulted || [])],
+        informed: [...(act.informed || [])],
+        gateOwner: act.gateOwner || null,
         friction: act.friction || '',
         resolution: act.resolution || '',
         deliverableDetails: act.deliverableDetails || '',
         notes: act.notes || '',
-        sharedWith: [...(act.sharedWith || [])],
         predecessors: [...(act.predecessors || [])],
         start: act.start,
         end: act.end
     };
-    
+
     // Get new values
     const newName = document.getElementById('slide-name').value || 'Activity';
     const newIsGate = document.getElementById('slide-gate').checked;
     const newIsDeliverable = document.getElementById('slide-deliverable').checked;
-    const newIsShared = document.getElementById('slide-shared').checked;
     const newFriction = document.getElementById('slide-friction').value || '';
     const newResolution = document.getElementById('slide-resolution').value || '';
     const newDeliverableDetails = document.getElementById('slide-deliverable-details').value || '';
     const newNotes = document.getElementById('slide-notes').value || '';
-    
-    // Get new shared with
-    let newSharedWith = [];
-    if (newIsShared) {
-        const checkboxes = document.querySelectorAll('#slide-shared-checkboxes input[type="checkbox"]:checked');
-        newSharedWith = Array.from(checkboxes).map(cb => cb.dataset.swimlaneId);
-    }
     
     // Calculate new position for gates
     let newStart = act.start;
@@ -1396,34 +1983,52 @@ function saveSlidePanel(shouldClose = true) {
         originalState.name !== newName ||
         originalState.isGate !== newIsGate ||
         originalState.isDeliverable !== newIsDeliverable ||
-        originalState.isShared !== newIsShared ||
+        originalState.accountable !== slideAccountable ||
+        JSON.stringify(originalState.responsible.sort()) !== JSON.stringify(slideResponsible.sort()) ||
+        JSON.stringify(originalState.consulted.sort()) !== JSON.stringify(slideConsulted.sort()) ||
+        JSON.stringify(originalState.informed.sort()) !== JSON.stringify(slideInformed.sort()) ||
+        originalState.gateOwner !== slideGateOwner ||
         originalState.friction !== newFriction ||
         originalState.resolution !== newResolution ||
         originalState.deliverableDetails !== newDeliverableDetails ||
         originalState.notes !== newNotes ||
-        JSON.stringify(originalState.sharedWith.sort()) !== JSON.stringify(newSharedWith.sort()) ||
         JSON.stringify(originalState.predecessors.sort()) !== JSON.stringify(newPredecessors.sort()) ||
         JSON.stringify(oldSuccs.sort()) !== JSON.stringify(newSuccessors.sort()) ||
         originalState.start !== newStart ||
         originalState.end !== newEnd
     );
-    
+
     // Apply changes
     act.name = newName;
     act.isGate = newIsGate;
     act.isDeliverable = newIsDeliverable;
-    act.isShared = newIsShared;
     act.friction = newFriction;
     act.resolution = newResolution;
     act.deliverableDetails = newDeliverableDetails;
     act.notes = newNotes;
-    act.sharedWith = newSharedWith;
     act.start = newStart;
     act.end = newEnd;
     act.startStage = percentToStage(newStart);
     act.endStage = percentToStage(newEnd);
     act.predecessors = newPredecessors;
     act.predecessor = newPredecessors.length > 0 ? newPredecessors[0] : null;
+
+    // Apply RACI data
+    if (newIsGate) {
+        act.gateOwner = slideGateOwner;
+        // Clear RACI fields for gates
+        delete act.accountable;
+        delete act.responsible;
+        delete act.consulted;
+        delete act.informed;
+    } else {
+        act.accountable = slideAccountable;
+        act.responsible = [...slideResponsible];
+        act.consulted = [...slideConsulted];
+        act.informed = [...slideInformed];
+        // Clear gate owner for regular activities
+        delete act.gateOwner;
+    }
     
     // Remove this activity from old successors that are no longer selected
     oldSuccs.forEach(oldSuccId => {
@@ -1832,10 +2437,16 @@ function closeStageEditModal() { document.getElementById('stage-edit-modal').cla
 function renderColorPicker() {
     const container = document.getElementById('stage-color-picker');
     container.innerHTML = STAGE_COLORS.map(color => `
-        <div class="color-option ${selectedStageColor === color ? 'selected' : ''}" 
-             style="background:${color};" 
+        <div class="color-option ${selectedStageColor === color ? 'selected' : ''}"
+             style="background:${color};"
              onclick="selectStageColor('${color}')"></div>
     `).join('');
+
+    // Sync color input
+    const colorInput = document.getElementById('stage-color-input');
+    if (colorInput && selectedStageColor) {
+        colorInput.value = selectedStageColor;
+    }
 }
 
 function selectStageColor(color) {
@@ -1854,6 +2465,168 @@ function confirmStageEdit() {
     markAsChanged();
     closeStageEditModal();
     renderStagesList();
+    render();
+}
+
+// Actors Modal
+let editingActorId = null;
+let selectedActorColor = null;
+
+function openActorsModal() {
+    renderActorsList();
+    document.getElementById('actors-modal').classList.add('visible');
+}
+
+function closeActorsModal() {
+    document.getElementById('actors-modal').classList.remove('visible');
+}
+
+function renderActorsList() {
+    const container = document.getElementById('actors-list');
+    if (!ganttData.actors) ganttData.actors = [];
+
+    container.innerHTML = ganttData.actors.map((actor) => {
+        return `
+        <div class="stage-list-item" style="display:flex;align-items:center;gap:10px;padding:10px 8px;border-bottom:1px solid var(--border);background:var(--bg-card);border-radius:6px;margin-bottom:6px;">
+            <div style="width:24px;height:24px;border-radius:50%;background:${actor.color};flex-shrink:0;"></div>
+            <div style="flex:1;">
+                <div style="font-weight:500;font-size:13px;">${actor.name}</div>
+            </div>
+            <button class="btn small" onclick="openActorEditModal('${actor.id}')">Edit</button>
+            <button class="btn small danger" onclick="deleteActor('${actor.id}')" ${ganttData.actors.length <= 1 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>Delete</button>
+        </div>
+    `}).join('');
+}
+
+function addActor() {
+    const newId = `actor_${Date.now()}`;
+    const colorIndex = ganttData.actors.length % ACTOR_COLORS.length;
+    ganttData.actors.push({
+        id: newId,
+        name: 'New Actor',
+        color: ACTOR_COLORS[colorIndex]
+    });
+    markAsChanged();
+    renderActorsList();
+    render();
+}
+
+function deleteActor(actorId) {
+    if (ganttData.actors.length <= 1) return;
+
+    // Check if actor is used in any activities
+    let isUsed = false;
+    ganttData.swimlanes.forEach(sl => {
+        sl.sections.forEach(sec => {
+            sec.activities.forEach(act => {
+                if (act.accountable === actorId ||
+                    act.gateOwner === actorId ||
+                    (act.responsible && act.responsible.includes(actorId)) ||
+                    (act.consulted && act.consulted.includes(actorId)) ||
+                    (act.informed && act.informed.includes(actorId))) {
+                    isUsed = true;
+                }
+            });
+        });
+    });
+
+    if (isUsed && !confirm('This actor is assigned to activities. Delete anyway? (Activities will lose this assignment)')) {
+        return;
+    }
+
+    // Remove actor from all activities
+    ganttData.swimlanes.forEach(sl => {
+        sl.sections.forEach(sec => {
+            sec.activities.forEach(act => {
+                if (act.accountable === actorId) act.accountable = null;
+                if (act.gateOwner === actorId) act.gateOwner = null;
+                if (act.responsible) act.responsible = act.responsible.filter(id => id !== actorId);
+                if (act.consulted) act.consulted = act.consulted.filter(id => id !== actorId);
+                if (act.informed) act.informed = act.informed.filter(id => id !== actorId);
+            });
+        });
+    });
+
+    ganttData.actors = ganttData.actors.filter(a => a.id !== actorId);
+    markAsChanged();
+    renderActorsList();
+    render();
+}
+
+function openActorEditModal(actorId) {
+    editingActorId = actorId;
+    const actor = ganttData.actors.find(a => a.id === actorId);
+    if (!actor) return;
+
+    document.getElementById('actor-edit-title').textContent = 'Edit Actor';
+    document.getElementById('actor-edit-name').value = actor.name;
+    selectedActorColor = actor.color;
+    renderActorColorPicker();
+    document.getElementById('actor-edit-modal').classList.add('visible');
+}
+
+function closeActorEditModal() {
+    document.getElementById('actor-edit-modal').classList.remove('visible');
+    editingActorId = null;
+}
+
+function renderActorColorPicker() {
+    const container = document.getElementById('actor-color-picker');
+    container.innerHTML = ACTOR_COLORS.map(color => `
+        <div class="color-option ${selectedActorColor === color ? 'selected' : ''}"
+             style="background:${color};"
+             onclick="selectActorColor('${color}')"></div>
+    `).join('');
+
+    // Sync color input
+    const colorInput = document.getElementById('actor-color-input');
+    if (colorInput && selectedActorColor) {
+        colorInput.value = selectedActorColor;
+    }
+}
+
+function selectActorColor(color) {
+    selectedActorColor = color;
+    renderActorColorPicker();
+}
+
+// Handle custom color inputs
+document.addEventListener('DOMContentLoaded', function() {
+    const actorColorInput = document.getElementById('actor-color-input');
+    if (actorColorInput) {
+        actorColorInput.addEventListener('input', function(e) {
+            selectedActorColor = e.target.value.toUpperCase();
+            renderActorColorPicker();
+        });
+    }
+
+    const swimlaneColorInput = document.getElementById('swimlane-color-input');
+    if (swimlaneColorInput) {
+        swimlaneColorInput.addEventListener('input', function(e) {
+            selectedSwimlaneColor = e.target.value.toUpperCase();
+            renderSwimlaneColorPicker();
+        });
+    }
+
+    const stageColorInput = document.getElementById('stage-color-input');
+    if (stageColorInput) {
+        stageColorInput.addEventListener('input', function(e) {
+            selectedStageColor = e.target.value.toUpperCase();
+            renderColorPicker();
+        });
+    }
+});
+
+function confirmActorEdit() {
+    if (!editingActorId) return;
+    const actor = ganttData.actors.find(a => a.id === editingActorId);
+    if (actor) {
+        actor.name = document.getElementById('actor-edit-name').value || actor.name;
+        actor.color = selectedActorColor;
+    }
+    markAsChanged();
+    closeActorEditModal();
+    renderActorsList();
     render();
 }
 
@@ -1974,11 +2747,46 @@ function loadFromLocalStorage() {
     }
 }
 
+function createNew() {
+    if (hasUnsavedChanges) {
+        if (!confirm('Create new project? All unsaved changes will be lost.')) {
+            return;
+        }
+    }
+
+    // Create empty gantt data with minimal structure
+    ganttData = {
+        stages: [
+            { id: 's1', num: '1', name: 'Stage 1', color: '#58a6ff' },
+            { id: 's2', num: '2', name: 'Stage 2', color: '#a371f7' },
+            { id: 's3', num: '3', name: 'Stage 3', color: '#f778ba' },
+            { id: 's4', num: '4', name: 'Stage 4', color: '#56d364' }
+        ],
+        actors: [
+            { id: 'actor1', name: 'Actor 1', color: '#FF6B6B' },
+            { id: 'actor2', name: 'Actor 2', color: '#4ECDC4' }
+        ],
+        swimlanes: []
+    };
+
+    // Clear filename
+    document.getElementById('project-filename').textContent = 'Untitled.json';
+
+    // Clear last imported data
+    lastImportedData = null;
+
+    // Clear local storage
+    localStorage.removeItem('pricefx-gantt-v6');
+
+    markAsSaved();
+    render();
+}
+
 function resetToDefault() {
-    const message = lastImportedData ? 
-        'Reset to last uploaded file? All unsaved changes will be lost.' : 
+    const message = lastImportedData ?
+        'Reset to last uploaded file? All unsaved changes will be lost.' :
         'Reset to tutorial data? All unsaved changes will be lost.';
-    
+
     if (confirm(message)) {
         if (lastImportedData) {
             // Reload the last imported data

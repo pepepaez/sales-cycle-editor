@@ -1,66 +1,62 @@
 const STAGE_COLORS = ['#58a6ff','#a371f7','#f778ba','#56d364','#f0883e','#f85149','#79c0ff','#ffd33d'];
-const ACTIVITY_COL_WIDTH = 380;
+let ACTIVITY_COL_WIDTH = 380;
+
+// Bright colors for actors
+const ACTOR_COLORS = [
+    '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
+    '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B739', '#52B788'
+];
+
+// Pastel colors for swimlanes (sections)
+const SWIMLANE_COLORS = [
+    '#FFE5E5', '#E5F9F9', '#E5F4FF', '#FFF0E5', '#E5F9F0',
+    '#FFFAE5', '#F5E5FF', '#E5F0FF', '#FFF7E5', '#E5FFE5'
+];
 
 let ganttData = {
     stages: [
-        { id: 's1', num: '1', name: 'Discovery', color: '#58a6ff' },
-        { id: 's2', num: '2', name: 'Evaluation', color: '#a371f7' },
-        { id: 's3', num: '3', name: 'Decision', color: '#f778ba' },
-        { id: 's4', num: '4', name: 'Close', color: '#56d364' }
+        { id: 's1', num: '1', name: 'Phase 1', color: '#58a6ff' },
+        { id: 's2', num: '2', name: 'Phase 2', color: '#a371f7' },
+        { id: 's3', num: '3', name: 'Phase 3', color: '#f778ba' },
+        { id: 's4', num: '4', name: 'Phase 4', color: '#56d364' }
+    ],
+    actors: [
+        { id: 'actor1', name: 'First Actor', color: '#FF6B6B' },
+        { id: 'actor2', name: 'Second Actor', color: '#4ECDC4' },
+        { id: 'actor3', name: 'Third Actor', color: '#45B7D1' },
+        { id: 'actor4', name: 'Fourth Actor', color: '#FFA07A' }
     ],
     swimlanes: [
         {
-            id: 'tutorial', name: 'HOW TO USE THIS EDITOR', color: '#58a6ff', collapsed: false,
+            id: 'tutorial1', name: 'Tutorial: Basic Features', color: '#FFE5E5', collapsed: false,
+            activities: [
+                { id: 'swim1', name: 'Swimlane-level activity (no section)', start: 5, end: 30, isGate: false, isDeliverable: false, accountable: 'actor1', responsible: ['actor2'], consulted: [], informed: [], predecessor: null, friction: '', resolution: '', deliverableDetails: '', notes: 'Activities can exist at the swimlane level without being in a section. Use the "+ Activity" button at the swimlane level to create these.' }
+            ],
             sections: [
-                { id: 'tut_basics', name: 'Basic Controls', collapsed: false, activities: [
-                    { id: 't1', name: 'Drag bar edges to resize activities', start: 5, end: 30, isGate: false, isDeliverable: false, isShared: false, sharedWith: [], predecessor: null, friction: '', resolution: '', deliverableDetails: '', notes: 'Grab the left or right edge of any bar and drag to change its start or end position. The bar will stay within stage boundaries.' },
-                    { id: 't2', name: 'Drag the bar center to move it', start: 35, end: 60, isGate: false, isDeliverable: false, isShared: false, sharedWith: [], predecessor: null, friction: '', resolution: '', deliverableDetails: '', notes: 'Click and drag the middle of a bar to move the entire activity left or right along the timeline.' },
-                    { id: 't3', name: 'Click activity name to edit details', start: 65, end: 95, isGate: false, isDeliverable: false, isShared: false, sharedWith: [], predecessor: null, friction: '', resolution: '', deliverableDetails: '', notes: 'Click on any activity name in the left column to open the edit modal where you can change all properties.' }
+                { id: 'basics', name: 'Section: Interactive Controls', collapsed: false, activities: [
+                    { id: 'act1', name: 'Drag bar edges to resize', start: 5, end: 30, isGate: false, isDeliverable: false, accountable: 'actor1', responsible: [], consulted: ['actor2'], informed: [], predecessor: null, friction: '', resolution: '', deliverableDetails: '', notes: 'Grab the left or right edge of any bar and drag to change duration.' },
+                    { id: 'act2', name: 'Drag center to move', start: 35, end: 60, isGate: false, isDeliverable: false, accountable: 'actor2', responsible: ['actor1'], consulted: [], informed: [], predecessor: null, friction: '', resolution: '', deliverableDetails: '', notes: 'Click and drag the middle of a bar to move it along the timeline.' },
+                    { id: 'act3', name: 'Click name to edit', start: 65, end: 95, isGate: false, isDeliverable: false, accountable: 'actor1', responsible: [], consulted: [], informed: ['actor3'], predecessor: null, friction: '', resolution: '', deliverableDetails: '', notes: 'Click activity name or double-click bar to open the edit panel.' }
                 ]},
-                { id: 'tut_features', name: 'Key Features', collapsed: false, activities: [
-                    { id: 't4', name: 'This is an Exit Gate (diamond marker)', start: 25, end: 25, isGate: true, isDeliverable: false, isShared: false, sharedWith: [], predecessor: 't1', friction: '', resolution: '', deliverableDetails: '', notes: 'Exit gates snap to stage boundaries. They represent checkpoints that must be passed before moving to the next stage. Toggle via the G badge or in edit modal.' },
-                    { id: 't5', name: 'This has a Deliverable (D indicator)', start: 30, end: 55, isGate: false, isDeliverable: true, isShared: false, sharedWith: [], predecessor: 't4', friction: '', resolution: '', deliverableDetails: 'Document, presentation, or artifact produced by this activity', notes: 'Activities marked as deliverables show a D indicator. Add details about what is produced in the Deliverable Details field.' },
-                    { id: 't6', name: 'This has Friction (warning indicator)', start: 55, end: 80, isGate: false, isDeliverable: false, isShared: false, sharedWith: [], predecessor: null, friction: 'This describes a known challenge or blocker', resolution: 'This describes how to address the friction', deliverableDetails: '', notes: 'Use friction and resolution fields to document known challenges and their solutions.' },
-                    { id: 't7', name: 'This has Notes (memo indicator)', start: 80, end: 100, isGate: false, isDeliverable: false, isShared: false, sharedWith: [], predecessor: null, friction: '', resolution: '', deliverableDetails: '', notes: 'The Notes field lets you capture additional context, instructions, or any other relevant information about an activity. Look for the memo icon on the bar!' }
+                { id: 'features', name: 'Section: Special Activity Types', collapsed: false, activities: [
+                    { id: 'gate1', name: 'Exit Gate', start: 25, end: 25, isGate: true, isDeliverable: false, gateOwner: 'actor4', predecessor: null, friction: '', resolution: '', deliverableDetails: '', notes: 'Exit gates (diamond markers) snap to stage boundaries and represent approval checkpoints.' },
+                    { id: 'deliv1', name: 'Activity with Deliverable (D)', start: 30, end: 55, isGate: false, isDeliverable: true, accountable: 'actor2', responsible: ['actor3'], consulted: [], informed: [], predecessor: null, friction: '', resolution: '', deliverableDetails: 'Example output or artifact', notes: 'The D indicator shows this activity produces a deliverable.' },
+                    { id: 'fric1', name: 'Activity with Friction (⚠)', start: 60, end: 85, isGate: false, isDeliverable: false, accountable: 'actor3', responsible: [], consulted: ['actor1'], informed: [], predecessor: null, friction: 'Known challenge or blocker', resolution: 'How to address it', deliverableDetails: '', notes: 'The warning icon indicates documented friction points.' }
                 ]}
             ]
         },
         {
-            id: 'deps', name: 'DEPENDENCIES EXAMPLE', color: '#a371f7', collapsed: false,
+            id: 'tutorial2', name: 'Tutorial: Dependencies & RACI', color: '#E5F9F9', collapsed: false,
             sections: [
-                { id: 'dep_sec', name: 'Predecessor and Successor Relationships', collapsed: false, activities: [
-                    { id: 'd1', name: 'First activity (has successors)', start: 5, end: 25, isGate: false, isDeliverable: false, isShared: false, sharedWith: [], predecessor: null, friction: '', resolution: '', deliverableDetails: '', notes: 'This activity has no predecessor but has successors. Hover over it to see the successor highlighted in green.' },
-                    { id: 'd2', name: 'Second activity (has predecessor and successor)', start: 28, end: 50, isGate: false, isDeliverable: false, isShared: false, sharedWith: [], predecessor: 'd1', friction: '', resolution: '', deliverableDetails: '', notes: 'This activity depends on the first one. Hover to see predecessor highlighted in blue and successor in green.' },
-                    { id: 'd3', name: 'Third activity (has predecessor only)', start: 55, end: 80, isGate: false, isDeliverable: false, isShared: false, sharedWith: [], predecessor: 'd2', friction: '', resolution: '', deliverableDetails: '', notes: 'This is the last in the chain. Hover to see its predecessor highlighted in blue.' },
-                    { id: 'd4', name: 'Hover over any bar to see dependencies highlighted!', start: 85, end: 100, isGate: false, isDeliverable: false, isShared: false, sharedWith: [], predecessor: null, friction: '', resolution: '', deliverableDetails: '', notes: 'The dependency indicator (arrows icon) appears on bars that have predecessors or successors.' }
-                ]}
-            ]
-        },
-        {
-            id: 'structure', name: 'ORGANIZING YOUR CHART', color: '#f0883e', collapsed: false,
-            sections: [
-                { id: 'struct_swim', name: 'Swimlanes (Top Level)', collapsed: false, activities: [
-                    { id: 's1a', name: 'Click swimlane name to collapse/expand', start: 5, end: 35, isGate: false, isDeliverable: false, isShared: false, sharedWith: [], predecessor: null, friction: '', resolution: '', deliverableDetails: '', notes: 'Swimlanes are the top-level groupings (like this one). Click the name to collapse. Use edit button to rename or change color.' },
-                    { id: 's2a', name: 'Use + Add Swimlane at bottom to create new ones', start: 40, end: 70, isGate: false, isDeliverable: false, isShared: false, sharedWith: [], predecessor: null, friction: '', resolution: '', deliverableDetails: '', notes: 'Scroll to the bottom of the chart to find the Add Swimlane button. Each swimlane can have its own color.' }
+                { id: 'deps', name: 'Section: Activity Dependencies', collapsed: false, activities: [
+                    { id: 'dep1', name: 'First activity', start: 5, end: 25, isGate: false, isDeliverable: false, accountable: 'actor1', responsible: [], consulted: [], informed: [], predecessor: null, friction: '', resolution: '', deliverableDetails: '', notes: 'This activity has no predecessor. Hover to see successor highlighted in green.' },
+                    { id: 'dep2', name: 'Depends on first', start: 30, end: 55, isGate: false, isDeliverable: false, accountable: 'actor2', responsible: ['actor1'], consulted: [], informed: [], predecessor: 'dep1', friction: '', resolution: '', deliverableDetails: '', notes: 'This depends on the first activity. Hover to see predecessor (blue) and successor (green).' },
+                    { id: 'dep3', name: 'Depends on second', start: 60, end: 85, isGate: false, isDeliverable: false, accountable: 'actor3', responsible: [], consulted: [], informed: [], predecessor: 'dep2', friction: '', resolution: '', deliverableDetails: '', notes: 'Last in the chain. Hover to see predecessor highlighted in blue.' }
                 ]},
-                { id: 'struct_sec', name: 'Sections (Within Swimlanes)', collapsed: false, activities: [
-                    { id: 's3a', name: 'Sections group related activities', start: 5, end: 40, isGate: false, isDeliverable: false, isShared: false, sharedWith: [], predecessor: null, friction: '', resolution: '', deliverableDetails: '', notes: 'Sections help organize activities within a swimlane. Click section header to collapse. Drag the handle to reorder sections.' },
-                    { id: 's4a', name: 'Click + on section header to add activity there', start: 45, end: 75, isGate: false, isDeliverable: false, isShared: false, sharedWith: [], predecessor: null, friction: '', resolution: '', deliverableDetails: '', notes: 'Each section has a + button to add activities directly to that section. You can also drag activities between sections.' }
-                ]},
-                { id: 'struct_act', name: 'Activities (The Bars)', collapsed: false, activities: [
-                    { id: 's5a', name: 'Drag the handle to reorder activities', start: 5, end: 50, isGate: false, isDeliverable: false, isShared: false, sharedWith: [], predecessor: null, friction: '', resolution: '', deliverableDetails: '', notes: 'Use the drag handle (dots) on the left of each activity to reorder within a section or move to another section in the same swimlane.' },
-                    { id: 's6a', name: 'Toggle G and D badges directly', start: 55, end: 95, isGate: false, isDeliverable: true, isShared: false, sharedWith: [], predecessor: null, friction: '', resolution: '', deliverableDetails: 'Quick toggle example', notes: 'The G (gate) and D (deliverable) badges can be clicked directly to toggle without opening the edit modal.' }
-                ]}
-            ]
-        },
-        {
-            id: 'toolbar', name: 'TOOLBAR FEATURES', color: '#3fb950', collapsed: false,
-            sections: [
-                { id: 'tool_sec', name: 'Top Toolbar Buttons', collapsed: false, activities: [
-                    { id: 'tb1', name: 'Stages button: configure stage names and colors', start: 5, end: 25, isGate: false, isDeliverable: false, isShared: false, sharedWith: [], predecessor: null, friction: '', resolution: '', deliverableDetails: '', notes: 'Click Stages in the toolbar to add, remove, rename, reorder, and recolor the stages at the top of the chart.' },
-                    { id: 'tb2', name: 'Export JSON: download your chart data', start: 28, end: 48, isGate: false, isDeliverable: false, isShared: false, sharedWith: [], predecessor: null, friction: '', resolution: '', deliverableDetails: '', notes: 'Export saves your entire chart as a JSON file that you can share or import later.' },
-                    { id: 'tb3', name: 'Import JSON: load a saved chart', start: 51, end: 71, isGate: false, isDeliverable: false, isShared: false, sharedWith: [], predecessor: null, friction: '', resolution: '', deliverableDetails: '', notes: 'Import loads a previously exported JSON file, replacing the current chart data.' },
-                    { id: 'tb4', name: 'Theme toggle: switch light/dark mode', start: 74, end: 100, isGate: false, isDeliverable: false, isShared: false, sharedWith: [], predecessor: null, friction: '', resolution: '', deliverableDetails: '', notes: 'Click the sun/moon icon to toggle between light and dark themes. Your preference is saved.' }
+                { id: 'raci', name: 'Section: RACI Model Explained', collapsed: false, activities: [
+                    { id: 'raci1', name: 'Accountable: One person (larger box)', start: 5, end: 40, isGate: false, isDeliverable: false, accountable: 'actor1', responsible: [], consulted: [], informed: [], predecessor: null, friction: '', resolution: '', deliverableDetails: '', notes: 'The larger colored box shows the Accountable actor - the one person ultimately answerable.' },
+                    { id: 'raci2', name: 'Responsible: Multiple people (small boxes)', start: 45, end: 80, isGate: false, isDeliverable: false, accountable: 'actor2', responsible: ['actor1', 'actor3'], consulted: [], informed: [], predecessor: null, friction: '', resolution: '', deliverableDetails: '', notes: 'Smaller boxes show Responsible actors - those doing the work. Can be multiple.' },
+                    { id: 'raci3', name: 'Full RACI: A, R, C, I roles', start: 85, end: 100, isGate: false, isDeliverable: false, accountable: 'actor4', responsible: ['actor1'], consulted: ['actor2'], informed: ['actor3'], predecessor: null, friction: '', resolution: '', deliverableDetails: '', notes: 'Accountable (decides), Responsible (does work), Consulted (provides input), Informed (kept updated). See tooltip!' }
                 ]}
             ]
         }

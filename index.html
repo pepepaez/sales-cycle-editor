@@ -20,6 +20,23 @@
                 </div>
             </div>
             <div class="toolbar">
+                <!-- File Management -->
+                <button class="btn" onclick="createNew()">New</button>
+                <button class="btn" onclick="document.getElementById('file-input').click()">Open</button>
+                <button class="btn primary" onclick="saveToLocalStorage()">Save</button>
+                <button class="btn primary" onclick="exportJSON()">Save As</button>
+                <button class="btn danger" onclick="resetToDefault()">Reset</button>
+                <input type="file" id="file-input" class="file-input" accept=".json" onchange="importJSON(event)">
+
+                <span class="toolbar-separator">|</span>
+
+                <!-- Data Management -->
+                <button class="btn" onclick="openStagesModal()">Stages</button>
+                <button class="btn" onclick="openActorsModal()">Actors</button>
+
+                <span class="toolbar-separator">|</span>
+
+                <!-- Theming -->
                 <button class="theme-toggle" onclick="toggleTheme()">
                     <span id="theme-icon">🌙</span>
                     <span id="theme-label">Dark</span>
@@ -33,12 +50,6 @@
                         <option value="18">X-Large</option>
                     </select>
                 </div>
-                <button class="btn" onclick="openStagesModal()">Stages</button>
-                <button class="btn primary" onclick="saveToLocalStorage()">Save</button>
-                <button class="btn primary" onclick="exportJSON()">Save As</button>
-                <input type="file" id="file-input" class="file-input" accept=".json" onchange="importJSON(event)">
-                <button class="btn" onclick="document.getElementById('file-input').click()">Import</button>
-                <button class="btn danger" onclick="resetToDefault()">Reset</button>
             </div>
         </div>
     </div>
@@ -169,7 +180,10 @@
             </div>
             <div class="form-group">
                 <label>Color</label>
-                <div class="color-picker" id="stage-color-picker"></div>
+                <div style="display: flex; gap: 12px; align-items: center;">
+                    <input type="color" id="stage-color-input" style="width: 80px; height: 40px; border: 1px solid var(--border); border-radius: 4px; cursor: pointer;">
+                    <div class="color-picker" id="stage-color-picker"></div>
+                </div>
             </div>
             <div class="modal-actions">
                 <button class="btn" onclick="closeStageEditModal()">Cancel</button>
@@ -177,7 +191,43 @@
             </div>
         </div>
     </div>
-    
+
+    <!-- Actors Modal -->
+    <div class="modal-overlay" id="actors-modal">
+        <div class="modal">
+            <h2>Manage Actors</h2>
+            <div id="actors-list"></div>
+            <div style="margin-top:14px;">
+                <button class="btn primary" onclick="addActor()">+ Add Actor</button>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeActorsModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Actor Edit Modal -->
+    <div class="modal-overlay" id="actor-edit-modal">
+        <div class="modal small">
+            <h2 id="actor-edit-title">Edit Actor</h2>
+            <div class="form-group">
+                <label>Actor Name</label>
+                <input type="text" id="actor-edit-name" placeholder="e.g., Account Executive">
+            </div>
+            <div class="form-group">
+                <label>Color (bright colors for visibility)</label>
+                <div style="display: flex; gap: 12px; align-items: center;">
+                    <input type="color" id="actor-color-input" style="width: 80px; height: 40px; border: 1px solid var(--border); border-radius: 4px; cursor: pointer;">
+                    <div class="color-picker" id="actor-color-picker"></div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeActorEditModal()">Cancel</button>
+                <button class="btn primary" onclick="confirmActorEdit()">Save</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Slide Panel -->
     <div class="slide-panel" id="slide-panel">
         <div class="slide-panel-resize" id="slide-panel-resize"></div>
@@ -187,7 +237,7 @@
         </div>
         <div class="slide-panel-body">
             <div class="form-section">
-                <div class="form-section-title">Basic Info</div>
+                <div class="form-section-title">📋 Basic Info</div>
                 <div class="form-group">
                     <label>Activity Name</label>
                     <input type="text" id="slide-name">
@@ -195,18 +245,52 @@
                 <div class="form-group">
                     <label>Properties</label>
                     <div class="checkbox-group">
-                        <label class="checkbox-item"><input type="checkbox" id="slide-gate"><span>Exit Gate</span></label>
+                        <label class="checkbox-item"><input type="checkbox" id="slide-gate" onchange="toggleSlideGateMode()"><span>Exit Gate</span></label>
                         <label class="checkbox-item"><input type="checkbox" id="slide-deliverable"><span>Deliverable</span></label>
-                        <label class="checkbox-item"><input type="checkbox" id="slide-shared" onchange="toggleSlideSharedWith()"><span>Shared</span></label>
                     </div>
                 </div>
-                <div class="form-group" id="slide-shared-with-section" style="display:none;">
-                    <label>Shared With</label>
-                    <div class="checkbox-group" id="slide-shared-checkboxes"></div>
+            </div>
+            <div class="form-section" id="slide-raci-section">
+                <div class="form-section-title">👥 RACI - Responsibility Assignment</div>
+                <div class="form-group">
+                    <label>Accountable (exactly one required)</label>
+                    <select id="slide-accountable" onchange="onSlideAccountableChange()" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);">
+                        <option value="">Select accountable actor...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Responsible (can be multiple)</label>
+                    <div id="slide-responsible-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;"></div>
+                    <select id="slide-responsible" onchange="onSlideResponsibleChange()" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);">
+                        <option value="">Add responsible actor...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Consulted (can be multiple)</label>
+                    <div id="slide-consulted-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;"></div>
+                    <select id="slide-consulted" onchange="onSlideConsultedChange()" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);">
+                        <option value="">Add consulted actor...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Informed (can be multiple)</label>
+                    <div id="slide-informed-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;"></div>
+                    <select id="slide-informed" onchange="onSlideInformedChange()" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);">
+                        <option value="">Add informed actor...</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-section" id="slide-gate-owner-section" style="display:none;">
+                <div class="form-section-title">🚪 Gate Owner</div>
+                <div class="form-group">
+                    <label>Owner (who approves this gate)</label>
+                    <select id="slide-gate-owner" onchange="onSlideGateOwnerChange()" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);">
+                        <option value="">Select gate owner...</option>
+                    </select>
                 </div>
             </div>
             <div class="form-section">
-                <div class="form-section-title">Dependencies</div>
+                <div class="form-section-title">🔗 Dependencies</div>
                 <div class="form-group">
                     <label>Predecessors</label>
                     <div class="searchable-select">
@@ -225,7 +309,7 @@
                 </div>
             </div>
             <div class="form-section">
-                <div class="form-section-title">Friction & Resolution</div>
+                <div class="form-section-title friction">⚠ Friction & Resolution</div>
                 <div class="form-group">
                     <label>Friction Point</label>
                     <textarea id="slide-friction" placeholder="Known challenges or blockers..."></textarea>
@@ -236,7 +320,7 @@
                 </div>
             </div>
             <div class="form-section">
-                <div class="form-section-title">Details</div>
+                <div class="form-section-title notes">📄 Details</div>
                 <div class="form-group">
                     <label>Deliverable Details</label>
                     <textarea id="slide-deliverable-details" placeholder="What is produced by this activity..."></textarea>
@@ -262,8 +346,11 @@
                 <input type="text" id="swimlane-name" placeholder="e.g., ACCOUNT EXECUTIVE">
             </div>
             <div class="form-group">
-                <label>Color</label>
-                <div class="color-picker" id="swimlane-color-picker"></div>
+                <label>Color (pastel colors recommended)</label>
+                <div style="display: flex; gap: 12px; align-items: center;">
+                    <input type="color" id="swimlane-color-input" style="width: 80px; height: 40px; border: 1px solid var(--border); border-radius: 4px; cursor: pointer;">
+                    <div class="color-picker" id="swimlane-color-picker"></div>
+                </div>
             </div>
             <div class="modal-actions">
                 <button class="btn" onclick="closeSwimlaneModal()">Cancel</button>
