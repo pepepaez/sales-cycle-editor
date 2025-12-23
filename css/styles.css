@@ -157,6 +157,7 @@
         .swimlane-label { padding: 8px 12px; font-weight: 600; font-size: var(--chart-text-size); display: flex; align-items: flex-start; gap: 8px; border-right: 1px solid var(--border); }
         .swimlane-label-content { display: flex; flex-direction: column; gap: 8px; flex: 1; }
         .swimlane-label-text { display: flex; align-items: center; gap: 8px; }
+        .swimlane-actions { display: flex; gap: 6px; flex-shrink: 0; justify-content: flex-end; }
         .swimlane-label.ae { color: var(--ae-color); }
         .swimlane-label.ss { color: var(--ss-color); }
         .swimlane-label.prospect { color: var(--prospect-color); }
@@ -171,7 +172,6 @@
         .swimlane-count { font-size: 10px; color: var(--text-muted); background: var(--bg-primary); padding: 1px 6px; border-radius: 10px; margin-left: 4px; }
         .swimlane-content { transition: max-height 0.3s ease-out; overflow: hidden; }
         .swimlane-content.collapsed { max-height: 0 !important; display: none; }
-        .swimlane-actions { display: flex; gap: 6px; flex-shrink: 0; }
         .column-resize-handle { position: absolute; right: 0; top: 0; bottom: 0; width: 6px; cursor: col-resize; z-index: 10; }
         .column-resize-handle:hover { background: var(--ss-color); opacity: 0.5; }
         .column-resize-handle.resizing { background: var(--ss-color); opacity: 0.8; }
