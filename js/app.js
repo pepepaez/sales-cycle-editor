@@ -291,17 +291,19 @@ function renderSwimlanes() {
             <div class="swimlane-header" style="grid-template-columns: ${ACTIVITY_COL_WIDTH}px 1fr;" data-swimlane-id="${sl.id}">
                 <div class="swimlane-label" style="color: ${slColor};position:relative;">
                     <span class="swimlane-drag-handle" draggable="true" data-swimlane-id="${sl.id}" style="cursor:move;margin-right:6px;opacity:0.5;" title="Drag to reorder">⋮⋮</span>
-                    <div class="swimlane-label-text" onclick="toggleSwimlaneCollapse('${sl.id}')" style="cursor:pointer;">
-                        <span class="swimlane-collapse ${sl.collapsed ? 'collapsed' : ''}">▸</span>
-                        <div class="swimlane-dot" style="background: ${slColor};"></div>
-                        <span>${sl.name}</span>
-                        <span class="swimlane-count">${totalActivities}</span>
-                    </div>
-                    <div class="swimlane-actions">
-                        <button class="add-btn" onclick="openSectionModal('${sl.id}')" ${sl.collapsed ? 'disabled style="opacity:0.4;"' : ''}>+ Section</button>
-                        <button class="add-btn" onclick="openAddActivityModal('${sl.id}')" ${sl.collapsed ? 'disabled style="opacity:0.4;"' : ''}>+ Activity</button>
-                        <button class="add-btn" onclick="openEditSwimlaneModal('${sl.id}')" title="Edit">✎</button>
-                        <button class="add-btn" onclick="deleteSwimlane('${sl.id}')" title="Delete" ${ganttData.swimlanes.length <= 1 ? 'disabled style="opacity:0.4;"' : ''}>✕</button>
+                    <div class="swimlane-label-content">
+                        <div class="swimlane-label-text" onclick="toggleSwimlaneCollapse('${sl.id}')" style="cursor:pointer;">
+                            <span class="swimlane-collapse ${sl.collapsed ? 'collapsed' : ''}">▸</span>
+                            <div class="swimlane-dot" style="background: ${slColor};"></div>
+                            <span>${sl.name}</span>
+                            <span class="swimlane-count">${totalActivities}</span>
+                        </div>
+                        <div class="swimlane-actions">
+                            <button class="add-btn" onclick="openSectionModal('${sl.id}')" ${sl.collapsed ? 'disabled style="opacity:0.4;"' : ''}>+ Section</button>
+                            <button class="add-btn" onclick="openAddActivityModal('${sl.id}')" ${sl.collapsed ? 'disabled style="opacity:0.4;"' : ''}>+ Activity</button>
+                            <button class="add-btn" onclick="openEditSwimlaneModal('${sl.id}')" title="Edit">✎</button>
+                            <button class="add-btn" onclick="deleteSwimlane('${sl.id}')" title="Delete" ${ganttData.swimlanes.length <= 1 ? 'disabled style="opacity:0.4;"' : ''}>✕</button>
+                        </div>
                     </div>
                     <div class="column-resize-handle" title="Drag to resize activity column"></div>
                 </div>
