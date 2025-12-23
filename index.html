@@ -237,94 +237,119 @@
         </div>
         <div class="slide-panel-body">
             <div class="form-section">
-                <div class="form-section-title">📋 Basic Info</div>
-                <div class="form-group">
-                    <label>Activity Name</label>
-                    <input type="text" id="slide-name">
+                <div class="form-section-title basic-info" onclick="toggleFormSection(this)">
+                    <span>📋 Basic Info</span>
+                    <span class="section-collapse">▸</span>
                 </div>
-                <div class="form-group">
-                    <label>Properties</label>
-                    <div class="checkbox-group">
-                        <label class="checkbox-item"><input type="checkbox" id="slide-gate" onchange="toggleSlideGateMode()"><span>Exit Gate</span></label>
-                        <label class="checkbox-item"><input type="checkbox" id="slide-deliverable" onchange="toggleSlideDeliverableDetails()"><span>Deliverable</span></label>
+                <div class="form-section-content">
+                    <div class="form-group">
+                        <label>Activity Name</label>
+                        <input type="text" id="slide-name">
                     </div>
-                </div>
-                <div class="form-group" id="slide-deliverable-details-section" style="display:none;">
-                    <label>Deliverable Details</label>
-                    <textarea id="slide-deliverable-details" placeholder="What is produced by this activity..."></textarea>
-                </div>
-                <div class="form-group">
-                    <label>Additional Notes</label>
-                    <textarea id="slide-notes" placeholder="Any additional context or information..."></textarea>
+                    <div class="form-group">
+                        <label>Properties</label>
+                        <div class="checkbox-group">
+                            <label class="checkbox-item"><input type="checkbox" id="slide-gate" onchange="toggleSlideGateMode()"><span>Exit Gate</span></label>
+                            <label class="checkbox-item"><input type="checkbox" id="slide-deliverable" onchange="toggleSlideDeliverableDetails()"><span>Deliverable</span></label>
+                        </div>
+                    </div>
+                    <div class="form-group" id="slide-deliverable-details-section" style="display:none;">
+                        <label>Deliverable Details</label>
+                        <textarea id="slide-deliverable-details" placeholder="What is produced by this activity..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Additional Notes</label>
+                        <textarea id="slide-notes" placeholder="Any additional context or information..."></textarea>
+                    </div>
                 </div>
             </div>
             <div class="form-section" id="slide-raci-section">
-                <div class="form-section-title">👥 RACI - Responsibility Assignment</div>
-                <div class="form-group">
-                    <label>Accountable (exactly one required)</label>
-                    <select id="slide-accountable" onchange="onSlideAccountableChange()" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);">
-                        <option value="">Select accountable actor...</option>
-                    </select>
+                <div class="form-section-title raci" onclick="toggleFormSection(this)">
+                    <span>👥 RACI - Responsibility Assignment</span>
+                    <span class="section-collapse">▸</span>
                 </div>
-                <div class="form-group">
-                    <label>Responsible (can be multiple)</label>
-                    <div id="slide-responsible-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;"></div>
-                    <select id="slide-responsible" onchange="onSlideResponsibleChange()" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);">
-                        <option value="">Add responsible actor...</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Consulted (can be multiple)</label>
-                    <div id="slide-consulted-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;"></div>
-                    <select id="slide-consulted" onchange="onSlideConsultedChange()" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);">
-                        <option value="">Add consulted actor...</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Informed (can be multiple)</label>
-                    <div id="slide-informed-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;"></div>
-                    <select id="slide-informed" onchange="onSlideInformedChange()" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);">
-                        <option value="">Add informed actor...</option>
-                    </select>
+                <div class="form-section-content">
+                    <div class="form-group">
+                        <label>Accountable (exactly one required)</label>
+                        <select id="slide-accountable" onchange="onSlideAccountableChange()" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);">
+                            <option value="">Select accountable actor...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Responsible (can be multiple)</label>
+                        <div id="slide-responsible-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;"></div>
+                        <select id="slide-responsible" onchange="onSlideResponsibleChange()" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);">
+                            <option value="">Add responsible actor...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Consulted (can be multiple)</label>
+                        <div id="slide-consulted-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;"></div>
+                        <select id="slide-consulted" onchange="onSlideConsultedChange()" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);">
+                            <option value="">Add consulted actor...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Informed (can be multiple)</label>
+                        <div id="slide-informed-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;"></div>
+                        <select id="slide-informed" onchange="onSlideInformedChange()" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);">
+                            <option value="">Add informed actor...</option>
+                        </select>
+                    </div>
                 </div>
             </div>
             <div class="form-section" id="slide-gate-owner-section" style="display:none;">
-                <div class="form-section-title">🚪 Gate Owner</div>
-                <div class="form-group">
-                    <label>Owner (who approves this gate)</label>
-                    <select id="slide-gate-owner" onchange="onSlideGateOwnerChange()" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);">
-                        <option value="">Select gate owner...</option>
-                    </select>
+                <div class="form-section-title gate-owner" onclick="toggleFormSection(this)">
+                    <span>🚪 Gate Owner</span>
+                    <span class="section-collapse">▸</span>
+                </div>
+                <div class="form-section-content">
+                    <div class="form-group">
+                        <label>Owner (who approves this gate)</label>
+                        <select id="slide-gate-owner" onchange="onSlideGateOwnerChange()" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);">
+                            <option value="">Select gate owner...</option>
+                        </select>
+                    </div>
                 </div>
             </div>
             <div class="form-section">
-                <div class="form-section-title">🔗 Dependencies</div>
-                <div class="form-group">
-                    <label>Predecessors</label>
-                    <div class="searchable-select">
-                        <input type="text" id="slide-pred-search" placeholder="Search activities..." oninput="filterSlidePredecessorList()" onfocus="showSlidePredecessorDropdown()">
-                        <div class="searchable-dropdown" id="slide-pred-dropdown"></div>
-                    </div>
-                    <div class="selected-items" id="slide-selected-preds"></div>
+                <div class="form-section-title dependencies" onclick="toggleFormSection(this)">
+                    <span>🔗 Dependencies</span>
+                    <span class="section-collapse">▸</span>
                 </div>
-                <div class="form-group">
-                    <label>Successors</label>
-                    <div class="searchable-select">
-                        <input type="text" id="slide-succ-search" placeholder="Search activities..." oninput="filterSlideSuccessorList()" onfocus="showSlideSuccessorDropdown()">
-                        <div class="searchable-dropdown" id="slide-succ-dropdown"></div>
+                <div class="form-section-content">
+                    <div class="form-group">
+                        <label>Predecessors</label>
+                        <div class="searchable-select">
+                            <input type="text" id="slide-pred-search" placeholder="Search activities..." oninput="filterSlidePredecessorList()" onfocus="showSlidePredecessorDropdown()">
+                            <div class="searchable-dropdown" id="slide-pred-dropdown"></div>
+                        </div>
+                        <div class="selected-items" id="slide-selected-preds"></div>
                     </div>
-                    <div class="selected-items" id="slide-selected-succs"></div>
+                    <div class="form-group">
+                        <label>Successors</label>
+                        <div class="searchable-select">
+                            <input type="text" id="slide-succ-search" placeholder="Search activities..." oninput="filterSlideSuccessorList()" onfocus="showSlideSuccessorDropdown()">
+                            <div class="searchable-dropdown" id="slide-succ-dropdown"></div>
+                        </div>
+                        <div class="selected-items" id="slide-selected-succs"></div>
+                    </div>
                 </div>
             </div>
             <div class="form-section">
-                <div class="form-section-title friction">⚠ Friction & Resolution</div>
-                <div class="form-group">
-                    <label>Friction Point</label>
-                    <textarea id="slide-friction" placeholder="Known challenges or blockers..."></textarea>
+                <div class="form-section-title friction" onclick="toggleFormSection(this)">
+                    <span>⚠ Friction & Resolution</span>
+                    <span class="section-collapse">▸</span>
                 </div>
-                <div class="form-group">
-                    <label>Resolution Path</label>
-                    <textarea id="slide-resolution" placeholder="How to address the friction..."></textarea>
+                <div class="form-section-content">
+                    <div class="form-group">
+                        <label>Friction Point</label>
+                        <textarea id="slide-friction" placeholder="Known challenges or blockers..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Resolution Path</label>
+                        <textarea id="slide-resolution" placeholder="How to address the friction..."></textarea>
+                    </div>
                 </div>
             </div>
         </div>

@@ -1740,6 +1740,23 @@ function toggleSlideDeliverableDetails() {
     }
 }
 
+function toggleFormSection(titleElement) {
+    const content = titleElement.nextElementSibling;
+    const isCollapsed = titleElement.classList.contains('collapsed');
+
+    if (isCollapsed) {
+        // Expand
+        titleElement.classList.remove('collapsed');
+        content.classList.remove('collapsed');
+        content.style.maxHeight = content.scrollHeight + 'px';
+    } else {
+        // Collapse
+        titleElement.classList.add('collapsed');
+        content.classList.add('collapsed');
+        content.style.maxHeight = '0';
+    }
+}
+
 function toggleSlideGateMode() {
     const isGate = document.getElementById('slide-gate').checked;
     document.getElementById('slide-raci-section').style.display = isGate ? 'none' : '';
@@ -1831,6 +1848,13 @@ function openSlidePanel(slId, secId, actId) {
 
     // Show/hide Deliverable Details section
     toggleSlideDeliverableDetails();
+
+    // Initialize max-height for all form section contents (for collapse animation)
+    document.querySelectorAll('.form-section-content').forEach(content => {
+        if (!content.classList.contains('collapsed')) {
+            content.style.maxHeight = content.scrollHeight + 'px';
+        }
+    });
 
     // Initialize predecessors
     if (Array.isArray(act.predecessors) && act.predecessors.length > 0) {
