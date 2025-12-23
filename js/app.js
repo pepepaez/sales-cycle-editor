@@ -1233,10 +1233,17 @@ function toggleGateProp(slId, secId, actId) {
             act.startStage = percentToStage(snapped);
             act.endStage = percentToStage(snapped);
         } else {
-            // Converting from gate to non-gate: ensure minimum 20% width
-            const currentPos = act.start;
-            act.start = currentPos;
-            act.end = Math.min(currentPos + 20, 100); // 20% width, but don't exceed 100%
+            // Converting from gate to non-gate: center 20% width bar on gate position
+            const gatePos = act.start;
+            const halfWidth = 10; // Half of 20% width
+            act.start = Math.max(0, gatePos - halfWidth);
+            act.end = Math.min(100, gatePos + halfWidth);
+            // If we hit the boundary, adjust the other side
+            if (gatePos - halfWidth < 0) {
+                act.end = 20;
+            } else if (gatePos + halfWidth > 100) {
+                act.start = 80;
+            }
         }
         markAsChanged();
         render();
@@ -2271,10 +2278,17 @@ function saveSlidePanel(shouldClose = true) {
         newStart = snapped;
         newEnd = snapped;
     } else if (originalState.isGate && !newIsGate) {
-        // Converting from gate to non-gate: ensure minimum 20% width
-        const currentPos = act.start;
-        newStart = currentPos;
-        newEnd = Math.min(currentPos + 20, 100); // 20% width, but don't exceed 100%
+        // Converting from gate to non-gate: center 20% width bar on gate position
+        const gatePos = act.start;
+        const halfWidth = 10; // Half of 20% width
+        newStart = Math.max(0, gatePos - halfWidth);
+        newEnd = Math.min(100, gatePos + halfWidth);
+        // If we hit the boundary, adjust the other side
+        if (gatePos - halfWidth < 0) {
+            newEnd = 20;
+        } else if (gatePos + halfWidth > 100) {
+            newStart = 80;
+        }
     }
     
     // Save predecessors
