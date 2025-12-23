@@ -466,10 +466,14 @@ function renderSwimlanes() {
                         <span class="swimlane-count">${totalActivities}</span>
                     </div>
                     <div class="swimlane-actions">
-                        <button class="add-btn" onclick="openSectionModal('${sl.id}')" ${sl.collapsed ? 'disabled style="opacity:0.4;"' : ''}>+ Section</button>
-                        <button class="add-btn" onclick="openAddActivityModal('${sl.id}')" ${sl.collapsed ? 'disabled style="opacity:0.4;"' : ''}>+ Activity</button>
-                        <button class="add-btn" onclick="openEditSwimlaneModal('${sl.id}')" title="Edit">✎</button>
-                        <button class="add-btn" onclick="deleteSwimlane('${sl.id}')" title="Delete" ${ganttData.swimlanes.length <= 1 ? 'disabled style="opacity:0.4;"' : ''}>✕</button>
+                        <div class="swimlane-action-group">
+                            <button class="add-btn swimlane-add-btn" onclick="openSectionModal('${sl.id}')" ${sl.collapsed ? 'disabled style="opacity:0.4;"' : ''}>+ Section</button>
+                            <button class="add-btn swimlane-add-btn" onclick="openAddActivityModal('${sl.id}')" ${sl.collapsed ? 'disabled style="opacity:0.4;"' : ''}>+ Activity</button>
+                        </div>
+                        <div class="swimlane-action-group">
+                            <button class="add-btn swimlane-icon-btn" onclick="openEditSwimlaneModal('${sl.id}')" title="Edit">✎</button>
+                            <button class="add-btn swimlane-icon-btn" onclick="deleteSwimlane('${sl.id}')" title="Delete" ${ganttData.swimlanes.length <= 1 ? 'disabled style="opacity:0.4;"' : ''}>✕</button>
+                        </div>
                     </div>
                     <div class="column-resize-handle" title="Drag to resize activity column"></div>
                 </div>
@@ -627,7 +631,7 @@ function renderActivityRow(sl, sec, act, stageCols) {
                     <div class="badge deliverable ${act.isDeliverable ? '' : 'inactive'}" onclick="toggleDeliverableProp('${sl.id}',${secId === null ? 'null' : `'${secId}'`},'${act.id}')" title="Deliverable">D</div>
                     <div class="badge gate ${act.isGate ? '' : 'inactive'}" onclick="toggleGateProp('${sl.id}',${secId === null ? 'null' : `'${secId}'`},'${act.id}')" title="Exit Gate">G</div>
                     <div class="badge friction ${hasFriction(act) ? '' : 'inactive'}" title="Friction Point">⚠</div>
-                    <div class="badge notes ${hasNotes(act) ? '' : 'inactive'}" title="Notes">📝</div>
+                    <div class="badge notes ${hasNotes(act) ? '' : 'inactive'}" title="Notes">${hasNotes(act) ? '📝' : '≡'}</div>
                     ${raciBadges}
                 </div>
                 <div class="activity-actions">
