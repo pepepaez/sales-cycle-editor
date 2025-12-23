@@ -119,6 +119,7 @@
         .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); cursor: pointer; padding: 4px 8px; border-radius: 4px; transition: all 0.2s; border: 2px solid transparent; }
         .legend-item:hover { background: var(--bg-card); }
         .legend-item.active { background: var(--bg-card); border-color: var(--border); color: var(--text); font-weight: 600; }
+        .legend-separator { width: 2px; height: 20px; background: var(--border); margin: 0 8px; }
         .legend-bar { width: 20px; height: 8px; border-radius: 2px; }
         .legend-bar.ae { background: var(--ae-color); }
         .legend-bar.ss { background: var(--ss-color); }

@@ -223,12 +223,26 @@ function render() {
     attachColumnResizeListeners();
 }
 
-// Track currently active actor filter
+// Track currently active filters
 let activeActorFilter = null;
+let activeActivityTypeFilter = null;
 
 function renderLegend() {
     const container = document.getElementById('legend');
     let html = '';
+
+    // Add activity types with their colors and click toggle functionality
+    if (ganttData.activityTypes && ganttData.activityTypes.length > 0) {
+        ganttData.activityTypes.forEach(type => {
+            const isActive = activeActivityTypeFilter === type.id ? ' active' : '';
+            html += `<div class="legend-item${isActive}" data-type-id="${type.id}" onclick="toggleActivityTypeHighlight('${type.id}')"><div class="legend-bar" style="background:${type.color}"></div>${type.name}</div>`;
+        });
+
+        // Add separator between activity types and actors
+        if (ganttData.actors && ganttData.actors.length > 0) {
+            html += `<div class="legend-separator"></div>`;
+        }
+    }
 
     // Add actors with their bright colors and click toggle functionality
     if (ganttData.actors && ganttData.actors.length > 0) {
@@ -241,6 +255,67 @@ function renderLegend() {
     container.innerHTML = html;
 }
 
+function toggleActivityTypeHighlight(typeId) {
+    // If clicking the same type, deactivate
+    if (activeActivityTypeFilter === typeId) {
+        activeActivityTypeFilter = null;
+        clearActivityTypeHighlight();
+        renderLegend(); // Re-render to remove active class
+        return;
+    }
+
+    // Otherwise, activate this type and deactivate actor filter
+    activeActivityTypeFilter = typeId;
+    activeActorFilter = null; // Deactivate actor filter
+    clearActivityTypeHighlight();
+    highlightActivityTypeActivities(typeId);
+    renderLegend(); // Re-render to update active class
+}
+
+function highlightActivityTypeActivities(typeId) {
+    ganttData.swimlanes.forEach(sl => {
+        // Check swimlane-level activities
+        if (sl.activities) {
+            sl.activities.forEach(act => {
+                if (act.activityType === typeId) {
+                    const actType = ganttData.activityTypes.find(t => t.id === typeId);
+                    if (actType) {
+                        highlightActivity(act.id, actType.color);
+                    }
+                }
+            });
+        }
+        // Check section activities
+        if (sl.sections) {
+            sl.sections.forEach(sec => {
+                if (sec.activities) {
+                    sec.activities.forEach(act => {
+                        if (act.activityType === typeId) {
+                            const actType = ganttData.activityTypes.find(t => t.id === typeId);
+                            if (actType) {
+                                highlightActivity(act.id, actType.color);
+                            }
+                        }
+                    });
+                }
+            });
+        }
+    });
+}
+
+function clearActivityTypeHighlight() {
+    document.querySelectorAll('.activity-row').forEach(row => {
+        const bar = row.querySelector('.bar');
+        if (bar) {
+            bar.style.outline = '';
+            bar.style.outlineOffset = '';
+        }
+        // Remove vertical bar indicator from activity label
+        const indicator = row.querySelector('.actor-filter-indicator');
+        if (indicator) indicator.remove();
+    });
+}
+
 function toggleActorHighlight(actorId) {
     // If clicking the same actor, deactivate
     if (activeActorFilter === actorId) {
@@ -250,8 +325,9 @@ function toggleActorHighlight(actorId) {
         return;
     }
 
-    // Otherwise, activate this actor and deactivate others
+    // Otherwise, activate this actor and deactivate activity type filter
     activeActorFilter = actorId;
+    activeActivityTypeFilter = null; // Deactivate activity type filter
     clearActorHighlight();
     highlightActorActivities(actorId);
     renderLegend(); // Re-render to update active class
