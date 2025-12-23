@@ -33,6 +33,7 @@
                 <!-- Data Management -->
                 <button class="btn" onclick="openStagesModal()">Stages</button>
                 <button class="btn" onclick="openActorsModal()">Actors</button>
+                <button class="btn" onclick="openActivityTypesModal()">Activity Types</button>
 
                 <span class="toolbar-separator">|</span>
 
@@ -228,6 +229,42 @@
         </div>
     </div>
 
+    <!-- Activity Types Modal -->
+    <div class="modal-overlay" id="activity-types-modal">
+        <div class="modal">
+            <h2>Manage Activity Types</h2>
+            <div id="activity-types-list"></div>
+            <div style="margin-top:14px;">
+                <button class="btn primary" onclick="addActivityType()">+ Add Activity Type</button>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeActivityTypesModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Activity Type Edit Modal -->
+    <div class="modal-overlay" id="activity-type-edit-modal">
+        <div class="modal small">
+            <h2 id="activity-type-edit-title">Edit Activity Type</h2>
+            <div class="form-group">
+                <label>Type Name</label>
+                <input type="text" id="activity-type-edit-name" placeholder="e.g., Discovery, Analysis, Design">
+            </div>
+            <div class="form-group">
+                <label>Color</label>
+                <div style="display: flex; gap: 12px; align-items: center;">
+                    <input type="color" id="activity-type-color-input" style="width: 80px; height: 40px; border: 1px solid var(--border); border-radius: 4px; cursor: pointer;">
+                    <div class="color-picker" id="activity-type-color-picker"></div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeActivityTypeEditModal()">Cancel</button>
+                <button class="btn primary" onclick="confirmActivityTypeEdit()">Save</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Slide Panel -->
     <div class="slide-panel" id="slide-panel">
         <div class="slide-panel-resize" id="slide-panel-resize"></div>
@@ -246,20 +283,26 @@
                         <label>Activity Name</label>
                         <input type="text" id="slide-name">
                     </div>
+                    <div class="form-group" id="slide-activity-type-section">
+                        <label>Activity Type</label>
+                        <select id="slide-activity-type" onchange="onSlideActivityTypeChange()">
+                            <option value="">None (White bar)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Additional Notes</label>
+                        <textarea id="slide-notes" placeholder="Any additional context or information..."></textarea>
+                    </div>
                     <div class="form-group">
                         <label>Properties</label>
-                        <div class="checkbox-group">
-                            <label class="checkbox-item"><input type="checkbox" id="slide-gate" onchange="toggleSlideGateMode()"><span>Exit Gate</span></label>
-                            <label class="checkbox-item"><input type="checkbox" id="slide-deliverable" onchange="toggleSlideDeliverableDetails()"><span>Deliverable</span></label>
+                        <div class="activity-badges" style="display: grid; grid-template-columns: repeat(2, 40px); gap: 6px; margin-top: 8px;">
+                            <div class="badge deliverable" id="slide-deliverable-badge" onclick="toggleSlideDeliverable()" title="Deliverable" style="width: 40px; height: 40px; font-size: 16px; cursor: pointer;">D</div>
+                            <div class="badge gate" id="slide-gate-badge" onclick="toggleSlideGate()" title="Exit Gate" style="width: 40px; height: 40px; font-size: 16px; cursor: pointer;">G</div>
                         </div>
                     </div>
                     <div class="form-group" id="slide-deliverable-details-section" style="display:none;">
                         <label>Deliverable Details</label>
                         <textarea id="slide-deliverable-details" placeholder="What is produced by this activity..."></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label>Additional Notes</label>
-                        <textarea id="slide-notes" placeholder="Any additional context or information..."></textarea>
                     </div>
                 </div>
             </div>

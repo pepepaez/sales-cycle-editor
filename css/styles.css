@@ -22,7 +22,7 @@
             --shared-border: rgba(163, 113, 247, 0.6);
             --gate-color: #f85149;
             --deliverable-color: #f0c14b;
-            --dependency-color: #79c0ff;
+            --dependency-color: #077ce2;
             --friction-color: #f97583;
         }
         html.light {
@@ -116,7 +116,9 @@
         .file-input { display: none; }
         .container { max-width: 1900px; margin: 0 auto; padding: 16px 24px; }
         .legend { display: flex; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
-        .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+        .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); cursor: pointer; padding: 4px 8px; border-radius: 4px; transition: all 0.2s; border: 2px solid transparent; }
+        .legend-item:hover { background: var(--bg-card); }
+        .legend-item.active { background: var(--bg-card); border-color: var(--border); color: var(--text); font-weight: 600; }
         .legend-bar { width: 20px; height: 8px; border-radius: 2px; }
         .legend-bar.ae { background: var(--ae-color); }
         .legend-bar.ss { background: var(--ss-color); }
@@ -329,10 +331,11 @@
             justify-content: space-between;
             flex-shrink: 0;
         }
-        .activity-label { padding: 6px 10px 6px 40px; font-size: var(--chart-text-size); color: var(--text-primary); border-right: 1px solid var(--border); display: flex; align-items: flex-start; gap: 6px; }
+        .activity-label { padding: 6px 10px 6px 40px; font-size: var(--chart-text-size); color: var(--text-primary); border-right: 1px solid var(--border); display: flex; align-items: flex-start; gap: 6px; position: relative; }
         .activity-drag-handle { color: var(--text-muted); cursor: grab; font-size: 11px; margin-top: 3px; }
         .activity-name { flex: 1; font-size: var(--chart-text-size); line-height: 1.4; padding: 2px 0; min-width: 0; word-wrap: break-word; cursor: pointer; }
         .activity-name:hover { color: var(--ss-color); }
+        .actor-filter-indicator { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
         .activity-badges { display: grid; grid-template-columns: repeat(2, 18px); gap: 3px; flex-shrink: 0; justify-content: flex-end; margin-top: 2px; }
         .badge { width: 18px; height: 18px; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; cursor: pointer; transition: transform 0.1s; flex-shrink: 0; }
         .badge:hover { transform: scale(1.15); }
@@ -363,11 +366,11 @@
         .bar.shared { background: var(--shared-bg); border: 1.5px solid var(--shared-border); color: var(--shared-color); }
         .bar.exit-gate { width: 22px !important; height: 22px; border-radius: 3px; transform: translateY(-50%) rotate(45deg); padding: 0; cursor: move; display: flex; align-items: center; justify-content: center; background: var(--gate-color); border: 2px solid var(--gate-color); color: white; }
         .bar.exit-gate .gate-label { transform: rotate(-45deg); font-size: 9px; font-weight: 700; }
-        .bar-indicators { position: absolute; right: 3px; top: 50%; transform: translateY(-50%); display: flex; gap: 2px; }
+        .bar-indicators { position: absolute; right: 3px; top: 50%; transform: translateY(-50%); display: flex; gap: 3px; }
         .bar.exit-gate .bar-indicators { display: none; }
-        .bar-indicator { width: 12px; height: 12px; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 700; border-radius: 2px; }
+        .bar-indicator { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; border-radius: 3px; border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
         .bar-indicator.deliverable { background: var(--deliverable-color); color: var(--bg-primary); border-radius: 50%; }
-        .bar-indicator.dependency { background: var(--dependency-color); color: white; }
+        .bar-indicator.dependency { background: var(--dependency-color); color: #ffffff; font-weight: 900; font-size: 13px; }
         .bar-indicator.friction { background: var(--friction-color); color: white; }
         .bar-indicator.notes { background: var(--ss-color); color: white; }
 

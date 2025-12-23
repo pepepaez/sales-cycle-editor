@@ -223,24 +223,115 @@ function render() {
     attachColumnResizeListeners();
 }
 
+// Track currently active actor filter
+let activeActorFilter = null;
+
 function renderLegend() {
     const container = document.getElementById('legend');
     let html = '';
 
-    // Add actors with their bright colors
+    // Add actors with their bright colors and click toggle functionality
     if (ganttData.actors && ganttData.actors.length > 0) {
         ganttData.actors.forEach(actor => {
-            html += `<div class="legend-item"><div class="legend-bar" style="background:${actor.color}"></div>${actor.name}</div>`;
+            const isActive = activeActorFilter === actor.id ? ' active' : '';
+            html += `<div class="legend-item${isActive}" data-actor-id="${actor.id}" onclick="toggleActorHighlight('${actor.id}')"><div class="legend-bar" style="background:${actor.color}"></div>${actor.name}</div>`;
         });
     }
 
-    // Add exit gate
-    html += `<div class="legend-item"><div class="legend-gate"></div>Exit Gate</div>`;
-
-    // Add deliverable
-    html += `<div class="legend-item"><div class="legend-icon deliverable">D</div>Deliverable</div>`;
-
     container.innerHTML = html;
+}
+
+function toggleActorHighlight(actorId) {
+    // If clicking the same actor, deactivate
+    if (activeActorFilter === actorId) {
+        activeActorFilter = null;
+        clearActorHighlight();
+        renderLegend(); // Re-render to remove active class
+        return;
+    }
+
+    // Otherwise, activate this actor and deactivate others
+    activeActorFilter = actorId;
+    clearActorHighlight();
+    highlightActorActivities(actorId);
+    renderLegend(); // Re-render to update active class
+}
+
+function highlightActorActivities(actorId) {
+    const actor = ganttData.actors.find(a => a.id === actorId);
+    if (!actor) return;
+
+    // Find all activities where this actor has any RACI role
+    ganttData.swimlanes.forEach(sl => {
+        // Check swimlane-level activities
+        if (sl.activities) {
+            sl.activities.forEach(act => {
+                if (isActorInActivity(act, actorId)) {
+                    highlightActivity(act.id, actor.color);
+                }
+            });
+        }
+        // Check section activities
+        if (sl.sections) {
+            sl.sections.forEach(sec => {
+                if (sec.activities) {
+                    sec.activities.forEach(act => {
+                        if (isActorInActivity(act, actorId)) {
+                            highlightActivity(act.id, actor.color);
+                        }
+                    });
+                }
+            });
+        }
+    });
+}
+
+function isActorInActivity(activity, actorId) {
+    // Check if actor is in any RACI role or is gate owner
+    if (activity.isGate) {
+        return activity.gateOwner === actorId;
+    }
+    return activity.accountable === actorId ||
+           (activity.responsible && activity.responsible.includes(actorId)) ||
+           (activity.consulted && activity.consulted.includes(actorId)) ||
+           (activity.informed && activity.informed.includes(actorId));
+}
+
+function highlightActivity(activityId, color) {
+    const activityRow = document.querySelector(`.activity-row[data-activity-id="${activityId}"]`);
+    if (activityRow) {
+        const bar = activityRow.querySelector('.bar');
+        if (bar) {
+            bar.style.outline = `3px solid ${color}`;
+            bar.style.outlineOffset = '2px';
+        }
+
+        // Add vertical bar indicator to activity label
+        const activityLabel = activityRow.querySelector('.activity-label');
+        if (activityLabel) {
+            // Create or update the indicator
+            let indicator = activityLabel.querySelector('.actor-filter-indicator');
+            if (!indicator) {
+                indicator = document.createElement('div');
+                indicator.className = 'actor-filter-indicator';
+                activityLabel.insertBefore(indicator, activityLabel.firstChild);
+            }
+            indicator.style.background = color;
+        }
+    }
+}
+
+function clearActorHighlight() {
+    // Remove outline from all activity bars
+    document.querySelectorAll('.bar').forEach(bar => {
+        bar.style.outline = '';
+        bar.style.outlineOffset = '';
+    });
+
+    // Remove indicators from activity names
+    document.querySelectorAll('.actor-filter-indicator').forEach(indicator => {
+        indicator.remove();
+    });
 }
 
 function renderStageHeaders() {
@@ -366,17 +457,23 @@ function renderActivityRow(sl, sec, act, stageCols) {
         stageBgs += `<div class="stage-bg" style="left:${i * stageWidth}%;width:${stageWidth}%;${i === stageCount - 1 ? 'border-right:none;' : ''}"></div>`;
     }
 
-    // Use swimlane color for activity bars
-    const slColor = sl.color || '#FFE5E5';
-    const barBg = hexToRgba(slColor, 0.4);
-    const barBorder = hexToRgba(slColor, 0.8);
+    // Use activity type color for activity bars, default to white if no type
+    let barColor = '#FFFFFF'; // Default white
+    if (act.activityType && ganttData.activityTypes) {
+        const actType = ganttData.activityTypes.find(t => t.id === act.activityType);
+        if (actType) {
+            barColor = actType.color;
+        }
+    }
+    const barBg = hexToRgba(barColor, 0.4);
+    const barBorder = hexToRgba(barColor, 0.8);
 
     const secId = sec ? sec.id : null;
 
     let barHtml;
     if (act.isGate) {
         // Gate bars use gate owner's color and initials
-        let gateColor = slColor;
+        let gateColor = '#FFFFFF'; // Default white
         let gateLabel = 'G';
         if (act.gateOwner && ganttData.actors) {
             const owner = ganttData.actors.find(a => a.id === act.gateOwner);
@@ -431,7 +528,7 @@ function renderActivityRow(sl, sec, act, stageCols) {
         let indicators = '';
         if (act.isDeliverable) indicators += '<div class="bar-indicator deliverable">D</div>';
         const actPreds = (Array.isArray(act.predecessors) && act.predecessors.length > 0) || act.predecessor;
-        if (actPreds || getSuccessors(act.id).length > 0) indicators += '<div class="bar-indicator dependency">⇆</div>';
+        if (actPreds || getSuccessors(act.id).length > 0) indicators += '<div class="bar-indicator dependency">⇋</div>';
         if (hasFriction(act)) indicators += '<div class="bar-indicator friction">⚠</div>';
         if (hasNotes(act)) indicators += '<div class="bar-indicator notes">📝</div>';
 
@@ -1627,6 +1724,28 @@ function renderActorBadge(actorId, role, onRemove) {
     </div>`;
 }
 
+function populateActivityTypeDropdown(elementId) {
+    const select = document.getElementById(elementId);
+    if (!select) return;
+
+    // Clear existing options except the first "None" option
+    select.innerHTML = '<option value="">None (White bar)</option>';
+
+    // Add activity types
+    if (ganttData.activityTypes) {
+        ganttData.activityTypes.forEach(type => {
+            const opt = document.createElement('option');
+            opt.value = type.id;
+            opt.textContent = type.name;
+            select.appendChild(opt);
+        });
+    }
+}
+
+function onSlideActivityTypeChange() {
+    // Just store the value - will be saved when panel is saved
+}
+
 function onSlideAccountableChange() {
     const select = document.getElementById('slide-accountable');
     slideAccountable = select.value || null;
@@ -1732,12 +1851,28 @@ function renderSlideInformedList() {
     ).join('');
 }
 
-function toggleSlideDeliverableDetails() {
-    const isDeliverable = document.getElementById('slide-deliverable').checked;
+function toggleSlideDeliverable() {
+    const badge = document.getElementById('slide-deliverable-badge');
     const detailsSection = document.getElementById('slide-deliverable-details-section');
+
+    // Toggle the inactive class
+    badge.classList.toggle('inactive');
+
+    // Show/hide deliverable details section
+    const isActive = !badge.classList.contains('inactive');
     if (detailsSection) {
-        detailsSection.style.display = isDeliverable ? '' : 'none';
+        detailsSection.style.display = isActive ? '' : 'none';
     }
+}
+
+function toggleSlideGate() {
+    const badge = document.getElementById('slide-gate-badge');
+
+    // Toggle the inactive class
+    badge.classList.toggle('inactive');
+
+    // Update RACI/Gate Owner sections
+    toggleSlideGateMode();
 }
 
 function toggleFormSection(titleElement) {
@@ -1758,9 +1893,14 @@ function toggleFormSection(titleElement) {
 }
 
 function toggleSlideGateMode() {
-    const isGate = document.getElementById('slide-gate').checked;
-    document.getElementById('slide-raci-section').style.display = isGate ? 'none' : '';
-    document.getElementById('slide-gate-owner-section').style.display = isGate ? '' : 'none';
+    const gateBadge = document.getElementById('slide-gate-badge');
+    const isGate = gateBadge && !gateBadge.classList.contains('inactive');
+
+    const raciSection = document.getElementById('slide-raci-section');
+    const gateOwnerSection = document.getElementById('slide-gate-owner-section');
+
+    raciSection.style.display = isGate ? 'none' : '';
+    gateOwnerSection.style.display = isGate ? '' : 'none';
 
     // Ensure dropdowns are populated when switching modes
     if (isGate) {
@@ -1770,6 +1910,13 @@ function toggleSlideGateMode() {
             gateOwnerSelect.value = slideGateOwner;
         } else {
             gateOwnerSelect.selectedIndex = 0; // Select placeholder
+        }
+
+        // Update max-height for the gate owner section content if not collapsed
+        const gateOwnerContent = gateOwnerSection.querySelector('.form-section-content');
+        const gateOwnerTitle = gateOwnerSection.querySelector('.form-section-title');
+        if (gateOwnerContent && gateOwnerTitle && !gateOwnerTitle.classList.contains('collapsed')) {
+            gateOwnerContent.style.maxHeight = gateOwnerContent.scrollHeight + 'px';
         }
     } else {
         populateActorDropdown('slide-accountable');
@@ -1781,6 +1928,13 @@ function toggleSlideGateMode() {
             accountableSelect.value = slideAccountable;
         } else {
             accountableSelect.selectedIndex = 0; // Select placeholder
+        }
+
+        // Update max-height for the RACI section content if not collapsed
+        const raciContent = raciSection.querySelector('.form-section-content');
+        const raciTitle = raciSection.querySelector('.form-section-title');
+        if (raciContent && raciTitle && !raciTitle.classList.contains('collapsed')) {
+            raciContent.style.maxHeight = raciContent.scrollHeight + 'px';
         }
     }
 }
@@ -1801,8 +1955,25 @@ function openSlidePanel(slId, secId, actId) {
     // Populate fields
     document.getElementById('slide-panel-title').textContent = `Edit: ${act.name}`;
     document.getElementById('slide-name').value = act.name;
-    document.getElementById('slide-gate').checked = act.isGate || false;
-    document.getElementById('slide-deliverable').checked = act.isDeliverable || false;
+
+    // Populate activity type dropdown
+    populateActivityTypeDropdown('slide-activity-type');
+    document.getElementById('slide-activity-type').value = act.activityType || '';
+
+    // Set badge states instead of checkboxes
+    const gateBadge = document.getElementById('slide-gate-badge');
+    const deliverableBadge = document.getElementById('slide-deliverable-badge');
+    if (act.isGate) {
+        gateBadge.classList.remove('inactive');
+    } else {
+        gateBadge.classList.add('inactive');
+    }
+    if (act.isDeliverable) {
+        deliverableBadge.classList.remove('inactive');
+    } else {
+        deliverableBadge.classList.add('inactive');
+    }
+
     document.getElementById('slide-friction').value = act.friction || '';
     document.getElementById('slide-resolution').value = act.resolution || '';
     document.getElementById('slide-deliverable-details').value = act.deliverableDetails || '';
@@ -1846,8 +2017,11 @@ function openSlidePanel(slId, secId, actId) {
     // Show/hide RACI vs Gate Owner sections
     toggleSlideGateMode();
 
-    // Show/hide Deliverable Details section
-    toggleSlideDeliverableDetails();
+    // Show/hide Deliverable Details section based on badge state
+    const deliverableDetailsSection = document.getElementById('slide-deliverable-details-section');
+    if (deliverableDetailsSection) {
+        deliverableDetailsSection.style.display = (deliverableBadge && !deliverableBadge.classList.contains('inactive')) ? '' : 'none';
+    }
 
     // Initialize max-height for all form section contents (for collapse animation)
     document.querySelectorAll('.form-section-content').forEach(content => {
@@ -1973,6 +2147,7 @@ function saveSlidePanel(shouldClose = true) {
     // Store original values for comparison
     const originalState = {
         name: act.name,
+        activityType: act.activityType || null,
         isGate: act.isGate,
         isDeliverable: act.isDeliverable,
         accountable: act.accountable || null,
@@ -1991,8 +2166,14 @@ function saveSlidePanel(shouldClose = true) {
 
     // Get new values
     const newName = document.getElementById('slide-name').value || 'Activity';
-    const newIsGate = document.getElementById('slide-gate').checked;
-    const newIsDeliverable = document.getElementById('slide-deliverable').checked;
+    const newActivityType = document.getElementById('slide-activity-type').value || null;
+
+    // Read badge states instead of checkboxes
+    const gateBadge = document.getElementById('slide-gate-badge');
+    const deliverableBadge = document.getElementById('slide-deliverable-badge');
+    const newIsGate = gateBadge && !gateBadge.classList.contains('inactive');
+    const newIsDeliverable = deliverableBadge && !deliverableBadge.classList.contains('inactive');
+
     const newFriction = document.getElementById('slide-friction').value || '';
     const newResolution = document.getElementById('slide-resolution').value || '';
     const newDeliverableDetails = document.getElementById('slide-deliverable-details').value || '';
@@ -2018,6 +2199,7 @@ function saveSlidePanel(shouldClose = true) {
     // Check if anything actually changed
     const hasChanges = (
         originalState.name !== newName ||
+        originalState.activityType !== newActivityType ||
         originalState.isGate !== newIsGate ||
         originalState.isDeliverable !== newIsDeliverable ||
         originalState.accountable !== slideAccountable ||
@@ -2037,6 +2219,7 @@ function saveSlidePanel(shouldClose = true) {
 
     // Apply changes
     act.name = newName;
+    act.activityType = newActivityType;
     act.isGate = newIsGate;
     act.isDeliverable = newIsDeliverable;
     act.friction = newFriction;
@@ -2652,6 +2835,14 @@ document.addEventListener('DOMContentLoaded', function() {
             renderColorPicker();
         });
     }
+
+    const activityTypeColorInput = document.getElementById('activity-type-color-input');
+    if (activityTypeColorInput) {
+        activityTypeColorInput.addEventListener('input', function(e) {
+            selectedActivityTypeColor = e.target.value.toUpperCase();
+            renderActivityTypeColorPicker();
+        });
+    }
 });
 
 function confirmActorEdit() {
@@ -2664,6 +2855,149 @@ function confirmActorEdit() {
     markAsChanged();
     closeActorEditModal();
     renderActorsList();
+    render();
+}
+
+// Activity Types Modal
+let editingActivityTypeId = null;
+let selectedActivityTypeColor = null;
+
+function openActivityTypesModal() {
+    renderActivityTypesList();
+    document.getElementById('activity-types-modal').classList.add('visible');
+}
+
+function closeActivityTypesModal() {
+    document.getElementById('activity-types-modal').classList.remove('visible');
+}
+
+function renderActivityTypesList() {
+    const container = document.getElementById('activity-types-list');
+    if (!ganttData.activityTypes) ganttData.activityTypes = [];
+
+    container.innerHTML = ganttData.activityTypes.map((type) => {
+        return `
+        <div class="stage-list-item" style="display:flex;align-items:center;gap:10px;padding:10px 8px;border-bottom:1px solid var(--border);background:var(--bg-card);border-radius:6px;margin-bottom:6px;">
+            <div style="width:24px;height:24px;border-radius:4px;background:${type.color};flex-shrink:0;"></div>
+            <div style="flex:1;">
+                <div style="font-weight:500;font-size:13px;">${type.name}</div>
+            </div>
+            <button class="btn small" onclick="openActivityTypeEditModal('${type.id}')">Edit</button>
+            <button class="btn small danger" onclick="deleteActivityType('${type.id}')" ${ganttData.activityTypes.length <= 1 ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>Delete</button>
+        </div>
+    `}).join('');
+}
+
+function addActivityType() {
+    const newId = `type_${Date.now()}`;
+    const colorIndex = ganttData.activityTypes.length % ACTIVITY_TYPE_COLORS.length;
+    ganttData.activityTypes.push({
+        id: newId,
+        name: 'New Type',
+        color: ACTIVITY_TYPE_COLORS[colorIndex]
+    });
+    markAsChanged();
+    renderActivityTypesList();
+    render();
+}
+
+function deleteActivityType(typeId) {
+    if (ganttData.activityTypes.length <= 1) return;
+
+    // Check if type is used in any activities
+    let isUsed = false;
+    ganttData.swimlanes.forEach(sl => {
+        if (sl.activities) {
+            sl.activities.forEach(act => {
+                if (act.activityType === typeId) isUsed = true;
+            });
+        }
+        if (sl.sections) {
+            sl.sections.forEach(sec => {
+                if (sec.activities) {
+                    sec.activities.forEach(act => {
+                        if (act.activityType === typeId) isUsed = true;
+                    });
+                }
+            });
+        }
+    });
+
+    if (isUsed && !confirm('This activity type is assigned to activities. Delete anyway? (Activities will lose this type assignment)')) {
+        return;
+    }
+
+    // Remove type from all activities
+    ganttData.swimlanes.forEach(sl => {
+        if (sl.activities) {
+            sl.activities.forEach(act => {
+                if (act.activityType === typeId) act.activityType = null;
+            });
+        }
+        if (sl.sections) {
+            sl.sections.forEach(sec => {
+                if (sec.activities) {
+                    sec.activities.forEach(act => {
+                        if (act.activityType === typeId) act.activityType = null;
+                    });
+                }
+            });
+        }
+    });
+
+    ganttData.activityTypes = ganttData.activityTypes.filter(t => t.id !== typeId);
+    markAsChanged();
+    renderActivityTypesList();
+    render();
+}
+
+function openActivityTypeEditModal(typeId) {
+    editingActivityTypeId = typeId;
+    const type = ganttData.activityTypes.find(t => t.id === typeId);
+    if (!type) return;
+
+    document.getElementById('activity-type-edit-title').textContent = 'Edit Activity Type';
+    document.getElementById('activity-type-edit-name').value = type.name;
+    selectedActivityTypeColor = type.color;
+    renderActivityTypeColorPicker();
+    document.getElementById('activity-type-edit-modal').classList.add('visible');
+}
+
+function closeActivityTypeEditModal() {
+    document.getElementById('activity-type-edit-modal').classList.remove('visible');
+    editingActivityTypeId = null;
+}
+
+function renderActivityTypeColorPicker() {
+    const container = document.getElementById('activity-type-color-picker');
+    container.innerHTML = ACTIVITY_TYPE_COLORS.map(color => `
+        <div class="color-option ${selectedActivityTypeColor === color ? 'selected' : ''}"
+             style="background:${color};"
+             onclick="selectActivityTypeColor('${color}')"></div>
+    `).join('');
+
+    // Sync color input
+    const colorInput = document.getElementById('activity-type-color-input');
+    if (colorInput && selectedActivityTypeColor) {
+        colorInput.value = selectedActivityTypeColor;
+    }
+}
+
+function selectActivityTypeColor(color) {
+    selectedActivityTypeColor = color;
+    renderActivityTypeColorPicker();
+}
+
+function confirmActivityTypeEdit() {
+    if (!editingActivityTypeId) return;
+    const type = ganttData.activityTypes.find(t => t.id === editingActivityTypeId);
+    if (type) {
+        type.name = document.getElementById('activity-type-edit-name').value || type.name;
+        type.color = selectedActivityTypeColor;
+    }
+    markAsChanged();
+    closeActivityTypeEditModal();
+    renderActivityTypesList();
     render();
 }
 
