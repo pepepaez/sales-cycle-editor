@@ -1240,10 +1240,14 @@ function toggleGateProp(slId, secId, actId) {
             act.end = Math.min(100, gatePos + halfWidth);
             // If we hit the boundary, adjust the other side
             if (gatePos - halfWidth < 0) {
+                act.start = 0;
                 act.end = 20;
             } else if (gatePos + halfWidth > 100) {
                 act.start = 80;
+                act.end = 100;
             }
+            act.startStage = percentToStage(act.start);
+            act.endStage = percentToStage(act.end);
         }
         markAsChanged();
         render();
@@ -2285,9 +2289,11 @@ function saveSlidePanel(shouldClose = true) {
         newEnd = Math.min(100, gatePos + halfWidth);
         // If we hit the boundary, adjust the other side
         if (gatePos - halfWidth < 0) {
+            newStart = 0;
             newEnd = 20;
         } else if (gatePos + halfWidth > 100) {
             newStart = 80;
+            newEnd = 100;
         }
     }
     
