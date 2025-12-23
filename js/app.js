@@ -1232,6 +1232,11 @@ function toggleGateProp(slId, secId, actId) {
             act.end = snapped;
             act.startStage = percentToStage(snapped);
             act.endStage = percentToStage(snapped);
+        } else {
+            // Converting from gate to non-gate: ensure minimum 20% width
+            const currentPos = act.start;
+            act.start = currentPos;
+            act.end = Math.min(currentPos + 20, 100); // 20% width, but don't exceed 100%
         }
         markAsChanged();
         render();
@@ -2265,6 +2270,11 @@ function saveSlidePanel(shouldClose = true) {
         const snapped = snapToStageEnd(act.end);
         newStart = snapped;
         newEnd = snapped;
+    } else if (originalState.isGate && !newIsGate) {
+        // Converting from gate to non-gate: ensure minimum 20% width
+        const currentPos = act.start;
+        newStart = currentPos;
+        newEnd = Math.min(currentPos + 20, 100); // 20% width, but don't exceed 100%
     }
     
     // Save predecessors
