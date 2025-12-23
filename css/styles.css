@@ -160,7 +160,11 @@
         .swimlane-header { display: grid; background: var(--bg-card); border-bottom: 1px solid var(--border); }
         .swimlane-label { padding: 8px 12px; font-weight: 600; font-size: var(--chart-text-size); display: flex; align-items: center; gap: 8px; border-right: 1px solid var(--border); }
         .swimlane-label-text { display: flex; align-items: center; gap: 8px; flex: 1; }
-        .swimlane-actions { display: flex; gap: 6px; flex-shrink: 0; }
+        .swimlane-actions { display: flex; gap: 8px; flex-shrink: 0; opacity: 0; transition: opacity 0.2s; }
+        .swimlane-label:hover .swimlane-actions { opacity: 1; }
+        .swimlane-action-group { display: flex; flex-direction: column; gap: 4px; }
+        .swimlane-add-btn { padding: 4px 8px; font-size: 11px; }
+        .swimlane-icon-btn { padding: 4px 8px; font-size: 12px; min-width: 28px; }
         .swimlane-label.ae { color: var(--ae-color); }
         .swimlane-label.ss { color: var(--ss-color); }
         .swimlane-label.prospect { color: var(--prospect-color); }
