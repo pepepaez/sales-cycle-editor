@@ -1957,6 +1957,12 @@ function toggleSlideDeliverable() {
     const isActive = !badge.classList.contains('inactive');
     if (detailsSection) {
         detailsSection.style.display = isActive ? '' : 'none';
+
+        // Recalculate parent form section height
+        const parentSection = detailsSection.closest('.form-section-content');
+        if (parentSection && !parentSection.classList.contains('collapsed')) {
+            parentSection.style.maxHeight = parentSection.scrollHeight + 'px';
+        }
     }
 }
 
