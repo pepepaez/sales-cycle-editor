@@ -246,8 +246,16 @@
                     <label>Properties</label>
                     <div class="checkbox-group">
                         <label class="checkbox-item"><input type="checkbox" id="slide-gate" onchange="toggleSlideGateMode()"><span>Exit Gate</span></label>
-                        <label class="checkbox-item"><input type="checkbox" id="slide-deliverable"><span>Deliverable</span></label>
+                        <label class="checkbox-item"><input type="checkbox" id="slide-deliverable" onchange="toggleSlideDeliverableDetails()"><span>Deliverable</span></label>
                     </div>
+                </div>
+                <div class="form-group" id="slide-deliverable-details-section" style="display:none;">
+                    <label>Deliverable Details</label>
+                    <textarea id="slide-deliverable-details" placeholder="What is produced by this activity..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Additional Notes</label>
+                    <textarea id="slide-notes" placeholder="Any additional context or information..."></textarea>
                 </div>
             </div>
             <div class="form-section" id="slide-raci-section">
@@ -317,17 +325,6 @@
                 <div class="form-group">
                     <label>Resolution Path</label>
                     <textarea id="slide-resolution" placeholder="How to address the friction..."></textarea>
-                </div>
-            </div>
-            <div class="form-section">
-                <div class="form-section-title notes">📄 Details</div>
-                <div class="form-group">
-                    <label>Deliverable Details</label>
-                    <textarea id="slide-deliverable-details" placeholder="What is produced by this activity..."></textarea>
-                </div>
-                <div class="form-group">
-                    <label>Additional Notes</label>
-                    <textarea id="slide-notes" placeholder="Any additional context or information..."></textarea>
                 </div>
             </div>
         </div>

@@ -35,7 +35,7 @@ let ganttData = {
             sections: [
                 { id: 'basics', name: 'Section: Interactive Controls', collapsed: false, activities: [
                     { id: 'act1', name: 'Drag bar edges to resize', start: 5, end: 30, isGate: false, isDeliverable: false, accountable: 'actor1', responsible: [], consulted: ['actor2'], informed: [], predecessor: null, friction: '', resolution: '', deliverableDetails: '', notes: 'Grab the left or right edge of any bar and drag to change duration.' },
-                    { id: 'act2', name: 'Drag center to move', start: 35, end: 60, isGate: false, isDeliverable: false, accountable: 'actor2', responsible: ['actor1'], consulted: [], informed: [], predecessor: null, friction: '', resolution: '', deliverableDetails: '', notes: 'Click and drag the middle of a bar to move it along the timeline.' },
+                    { id: 'act2', name: 'Drag center to move (no notes)', start: 35, end: 60, isGate: false, isDeliverable: false, accountable: 'actor2', responsible: ['actor1'], consulted: [], informed: [], predecessor: null, friction: '', resolution: '', deliverableDetails: '', notes: '' },
                     { id: 'act3', name: 'Click name to edit', start: 65, end: 95, isGate: false, isDeliverable: false, accountable: 'actor1', responsible: [], consulted: [], informed: ['actor3'], predecessor: null, friction: '', resolution: '', deliverableDetails: '', notes: 'Click activity name or double-click bar to open the edit panel.' }
                 ]},
                 { id: 'features', name: 'Section: Special Activity Types', collapsed: false, activities: [

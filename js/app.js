@@ -1730,6 +1730,14 @@ function renderSlideInformedList() {
     ).join('');
 }
 
+function toggleSlideDeliverableDetails() {
+    const isDeliverable = document.getElementById('slide-deliverable').checked;
+    const detailsSection = document.getElementById('slide-deliverable-details-section');
+    if (detailsSection) {
+        detailsSection.style.display = isDeliverable ? '' : 'none';
+    }
+}
+
 function toggleSlideGateMode() {
     const isGate = document.getElementById('slide-gate').checked;
     document.getElementById('slide-raci-section').style.display = isGate ? 'none' : '';
@@ -1818,7 +1826,10 @@ function openSlidePanel(slId, secId, actId) {
 
     // Show/hide RACI vs Gate Owner sections
     toggleSlideGateMode();
-    
+
+    // Show/hide Deliverable Details section
+    toggleSlideDeliverableDetails();
+
     // Initialize predecessors
     if (Array.isArray(act.predecessors) && act.predecessors.length > 0) {
         slidePredecessors = [...act.predecessors];
