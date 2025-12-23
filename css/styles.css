@@ -116,6 +116,7 @@
         .file-input { display: none; }
         .container { max-width: 1900px; margin: 0 auto; padding: 16px 24px; }
         .legend { display: flex; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
+        .legend-header { font-size: 13px; font-weight: 600; color: var(--text); text-transform: uppercase; letter-spacing: 0.5px; margin-right: -8px; }
         .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); cursor: pointer; padding: 4px 8px; border-radius: 4px; transition: all 0.2s; border: 2px solid transparent; }
         .legend-item:hover { background: var(--bg-card); }
         .legend-item.active { background: var(--bg-card); border-color: var(--border); color: var(--text); font-weight: 600; }

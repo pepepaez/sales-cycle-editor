@@ -231,8 +231,9 @@ function renderLegend() {
     const container = document.getElementById('legend');
     let html = '';
 
-    // Add activity types with their colors and click toggle functionality
+    // Add activity types with header and click toggle functionality
     if (ganttData.activityTypes && ganttData.activityTypes.length > 0) {
+        html += `<div class="legend-header">Activity Types:</div>`;
         ganttData.activityTypes.forEach(type => {
             const isActive = activeActivityTypeFilter === type.id ? ' active' : '';
             html += `<div class="legend-item${isActive}" data-type-id="${type.id}" onclick="toggleActivityTypeHighlight('${type.id}')"><div class="legend-bar" style="background:${type.color}"></div>${type.name}</div>`;
@@ -244,8 +245,9 @@ function renderLegend() {
         }
     }
 
-    // Add actors with their bright colors and click toggle functionality
+    // Add actors with header and click toggle functionality
     if (ganttData.actors && ganttData.actors.length > 0) {
+        html += `<div class="legend-header">Actors:</div>`;
         ganttData.actors.forEach(actor => {
             const isActive = activeActorFilter === actor.id ? ' active' : '';
             html += `<div class="legend-item${isActive}" data-actor-id="${actor.id}" onclick="toggleActorHighlight('${actor.id}')"><div class="legend-bar" style="background:${actor.color}"></div>${actor.name}</div>`;
