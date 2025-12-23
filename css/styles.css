@@ -158,10 +158,9 @@
         .swimlane.dragging { opacity: 0.4; }
         .swimlane.drag-over { border-top: 3px solid var(--ss-color); }
         .swimlane-header { display: grid; background: var(--bg-card); border-bottom: 1px solid var(--border); }
-        .swimlane-label { padding: 8px 12px; font-weight: 600; font-size: var(--chart-text-size); display: flex; align-items: flex-start; gap: 8px; border-right: 1px solid var(--border); }
-        .swimlane-label-content { display: flex; flex-direction: column; gap: 8px; flex: 1; }
-        .swimlane-label-text { display: flex; align-items: center; gap: 8px; }
-        .swimlane-actions { display: flex; gap: 6px; flex-shrink: 0; justify-content: flex-end; }
+        .swimlane-label { padding: 8px 12px; font-weight: 600; font-size: var(--chart-text-size); display: flex; align-items: center; gap: 8px; border-right: 1px solid var(--border); }
+        .swimlane-label-text { display: flex; align-items: center; gap: 8px; flex: 1; }
+        .swimlane-actions { display: flex; gap: 6px; flex-shrink: 0; }
         .swimlane-label.ae { color: var(--ae-color); }
         .swimlane-label.ss { color: var(--ss-color); }
         .swimlane-label.prospect { color: var(--prospect-color); }

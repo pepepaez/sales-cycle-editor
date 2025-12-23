@@ -21,6 +21,7 @@ const ACTIVITY_TYPE_COLORS = [
 ];
 
 let ganttData = {
+    activityColumnWidth: 380,
     stages: [
         { id: 's1', num: '1', name: 'Phase 1', color: '#58a6ff' },
         { id: 's2', num: '2', name: 'Phase 2', color: '#a371f7' },

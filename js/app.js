@@ -460,19 +460,16 @@ function renderSwimlanes() {
             <div class="swimlane-header" style="grid-template-columns: ${ACTIVITY_COL_WIDTH}px 1fr;" data-swimlane-id="${sl.id}">
                 <div class="swimlane-label" style="color: ${slColor};position:relative;">
                     <span class="swimlane-drag-handle" draggable="true" data-swimlane-id="${sl.id}" style="cursor:move;margin-right:6px;opacity:0.5;" title="Drag to reorder">⋮⋮</span>
-                    <div class="swimlane-label-content">
-                        <div class="swimlane-label-text" onclick="toggleSwimlaneCollapse('${sl.id}')" style="cursor:pointer;">
-                            <span class="swimlane-collapse ${sl.collapsed ? 'collapsed' : ''}">▸</span>
-                            <div class="swimlane-dot" style="background: ${slColor};"></div>
-                            <span>${sl.name}</span>
-                            <span class="swimlane-count">${totalActivities}</span>
-                        </div>
-                        <div class="swimlane-actions">
-                            <button class="add-btn" onclick="openSectionModal('${sl.id}')" ${sl.collapsed ? 'disabled style="opacity:0.4;"' : ''}>+ Section</button>
-                            <button class="add-btn" onclick="openAddActivityModal('${sl.id}')" ${sl.collapsed ? 'disabled style="opacity:0.4;"' : ''}>+ Activity</button>
-                            <button class="add-btn" onclick="openEditSwimlaneModal('${sl.id}')" title="Edit">✎</button>
-                            <button class="add-btn" onclick="deleteSwimlane('${sl.id}')" title="Delete" ${ganttData.swimlanes.length <= 1 ? 'disabled style="opacity:0.4;"' : ''}>✕</button>
-                        </div>
+                    <div class="swimlane-label-text" onclick="toggleSwimlaneCollapse('${sl.id}')" style="cursor:pointer;">
+                        <span class="swimlane-collapse ${sl.collapsed ? 'collapsed' : ''}">▸</span>
+                        <span>${sl.name}</span>
+                        <span class="swimlane-count">${totalActivities}</span>
+                    </div>
+                    <div class="swimlane-actions">
+                        <button class="add-btn" onclick="openSectionModal('${sl.id}')" ${sl.collapsed ? 'disabled style="opacity:0.4;"' : ''}>+ Section</button>
+                        <button class="add-btn" onclick="openAddActivityModal('${sl.id}')" ${sl.collapsed ? 'disabled style="opacity:0.4;"' : ''}>+ Activity</button>
+                        <button class="add-btn" onclick="openEditSwimlaneModal('${sl.id}')" title="Edit">✎</button>
+                        <button class="add-btn" onclick="deleteSwimlane('${sl.id}')" title="Delete" ${ganttData.swimlanes.length <= 1 ? 'disabled style="opacity:0.4;"' : ''}>✕</button>
                     </div>
                     <div class="column-resize-handle" title="Drag to resize activity column"></div>
                 </div>
@@ -3084,10 +3081,13 @@ function exportJSON() {
     // Get current filename without extension for the prompt
     const currentFilename = document.getElementById('project-filename').textContent.trim();
     const baseFilename = currentFilename.replace('.json', '');
-    
+
     const filename = prompt('Enter filename:', baseFilename);
     if (filename === null) return; // User cancelled
-    
+
+    // Save current activity column width
+    ganttData.activityColumnWidth = ACTIVITY_COL_WIDTH;
+
     const json = JSON.stringify(ganttData, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -3130,14 +3130,19 @@ function importJSON(event) {
                 }
                 ganttData = data;
                 lastImportedData = JSON.parse(JSON.stringify(data)); // Store deep copy of imported data
-                
+
+                // Load activity column width if present
+                if (data.activityColumnWidth) {
+                    ACTIVITY_COL_WIDTH = data.activityColumnWidth;
+                }
+
                 // Update displayed filename to imported file name
                 let importedFilename = file.name;
                 if (!importedFilename.endsWith('.json')) {
                     importedFilename += '.json';
                 }
                 document.getElementById('project-filename').textContent = importedFilename;
-                
+
                 markAsSaved(); // Mark as saved since we just loaded new data
                 render();
                 alert('Imported successfully!');
@@ -3153,6 +3158,9 @@ function importJSON(event) {
 }
 
 function saveToLocalStorage() {
+    // Save current activity column width
+    ganttData.activityColumnWidth = ACTIVITY_COL_WIDTH;
+
     const json = JSON.stringify(ganttData, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -3263,5 +3271,11 @@ window.addEventListener('beforeunload', function(e) {
 loadTheme();
 loadTextSize();
 loadFromLocalStorage();
+
+// Initialize activity column width from data
+if (ganttData.activityColumnWidth) {
+    ACTIVITY_COL_WIDTH = ganttData.activityColumnWidth;
+}
+
 markAsSaved(); // Initialize as saved on load
 render();
