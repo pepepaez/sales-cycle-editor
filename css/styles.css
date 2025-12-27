@@ -442,6 +442,7 @@
             transform: rotate(0deg);
         }
         .form-section-title.basic-info { background: #52B788; color: white; }
+        .form-section-title.stage-notes { background: #ffd33d; color: #1a1a1a; }
         .form-section-title.raci { background: #4ECDC4; color: #1a1a1a; }
         .form-section-title.gate-owner { background: #BB8FCE; color: white; }
         .form-section-title.dependencies { background: #F7DC6F; color: #1a1a1a; }

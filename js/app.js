@@ -962,6 +962,12 @@ function showTooltip(e) {
     const stageIdx = Math.floor(act.start / getStageWidth());
     const stageName = ganttData.stages[Math.min(stageIdx, ganttData.stages.length - 1)]?.name || '';
 
+    // Calculate which stage the mouse is hovering over
+    const chartRect = bar.parentElement.getBoundingClientRect();
+    const mouseX = e.clientX - chartRect.left;
+    const mousePercent = (mouseX / chartRect.width) * 100;
+    const hoveredStage = getStageAtPosition(mousePercent);
+
     // Highlight predecessors and successors
     highlightDependencies(actId, predIds, succs.map(s => s.activity.id));
 
@@ -1018,6 +1024,12 @@ function showTooltip(e) {
     if (act.resolution?.trim()) html += `<div class="tooltip-section"><div class="tooltip-section-title">Resolution</div><div class="tooltip-text">${act.resolution}</div></div>`;
     if (act.deliverableDetails?.trim()) html += `<div class="tooltip-section"><div class="tooltip-section-title">📄 Deliverable</div><div class="tooltip-text">${act.deliverableDetails}</div></div>`;
     if (act.notes?.trim()) html += `<div class="tooltip-section"><div class="tooltip-section-title">📝 Notes</div><div class="tooltip-text">${act.notes}</div></div>`;
+
+    // Show stage-specific note if hovering over a stage with notes
+    if (hoveredStage && act.stageNotes && act.stageNotes[hoveredStage.id]) {
+        html += `<div class="tooltip-section" style="background: rgba(255, 211, 61, 0.1); border-left: 3px solid #ffd33d;"><div class="tooltip-section-title">🔖 ${hoveredStage.name} Notes</div><div class="tooltip-text">${act.stageNotes[hoveredStage.id]}</div></div>`;
+    }
+
     tooltip.innerHTML = html;
     tooltip.classList.add('visible');
 
@@ -2242,6 +2254,26 @@ document.addEventListener('keydown', function(e) {
 // RACI functions removed - now using actor-based RACI model
 
 // ===== STAGE-SPECIFIC NOTES =====
+
+function getStageAtPosition(percentPosition) {
+    // Calculate which stage a given percentage position falls into
+    const totalStages = ganttData.stages.length;
+    const stageDuration = 100 / totalStages;
+
+    for (let i = 0; i < ganttData.stages.length; i++) {
+        const stage = ganttData.stages[i];
+        const stageNum = parseInt(stage.num);
+        const stageStart = stageNum * stageDuration;
+        const stageEnd = (stageNum + 1) * stageDuration;
+
+        if (percentPosition >= stageStart && percentPosition < stageEnd) {
+            return stage;
+        }
+    }
+
+    // If at the very end, return the last stage
+    return ganttData.stages[ganttData.stages.length - 1];
+}
 
 function populateStageNotesSection(act) {
     const section = document.getElementById('slide-stage-notes-section');
