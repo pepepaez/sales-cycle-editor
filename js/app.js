@@ -195,7 +195,9 @@ function getPredecessors(activityId) {
 }
 
 function hasFriction(act) { return act.friction && act.friction.trim().length > 0; }
-function hasNotes(act) { return act.notes && act.notes.trim().length > 0; }
+function hasStageNotes(act) {
+    return act.stageNotes && Object.keys(act.stageNotes).some(stageId => act.stageNotes[stageId]?.trim());
+}
 
 function updateGridTemplates() {
     const stageCount = ganttData.stages.length;
@@ -603,13 +605,13 @@ function renderActivityRow(sl, sec, act, stageCols) {
             });
         }
 
-        // Other indicators (deliverable, dependencies, friction, notes)
+        // Other indicators (deliverable, dependencies, friction, stage notes)
         let indicators = '';
         if (act.isDeliverable) indicators += '<div class="bar-indicator deliverable">D</div>';
         const actPreds = (Array.isArray(act.predecessors) && act.predecessors.length > 0) || act.predecessor;
         if (actPreds || getSuccessors(act.id).length > 0) indicators += '<div class="bar-indicator dependency">⇋</div>';
         if (hasFriction(act)) indicators += '<div class="bar-indicator friction">⚠</div>';
-        if (hasNotes(act)) indicators += '<div class="bar-indicator notes">📝</div>';
+        if (hasStageNotes(act)) indicators += '<div class="bar-indicator notes">📝</div>';
 
         barHtml = `<div class="bar" style="left:${act.start}%;width:${width}%;background:${barBg};border:1.5px solid ${barBorder};" data-swimlane="${sl.id}" data-section="${secId}" data-activity="${act.id}">
             <div class="resize-handle left" data-handle="left"></div>
@@ -631,7 +633,7 @@ function renderActivityRow(sl, sec, act, stageCols) {
                     <div class="badge deliverable ${act.isDeliverable ? '' : 'inactive'}" onclick="toggleDeliverableProp('${sl.id}',${secId === null ? 'null' : `'${secId}'`},'${act.id}')" title="Deliverable">D</div>
                     <div class="badge gate ${act.isGate ? '' : 'inactive'}" onclick="toggleGateProp('${sl.id}',${secId === null ? 'null' : `'${secId}'`},'${act.id}')" title="Exit Gate">G</div>
                     <div class="badge friction ${hasFriction(act) ? '' : 'inactive'}" title="Friction Point">⚠</div>
-                    <div class="badge notes ${hasNotes(act) ? '' : 'inactive'}" title="Notes">${hasNotes(act) ? '📝' : '≡'}</div>
+                    <div class="badge notes ${hasStageNotes(act) ? '' : 'inactive'}" title="Stage Notes">${hasStageNotes(act) ? '📝' : '≡'}</div>
                     ${raciBadges}
                 </div>
                 <div class="activity-actions">
@@ -963,11 +965,6 @@ function showTooltip(e) {
     const stageName = ganttData.stages[Math.min(stageIdx, ganttData.stages.length - 1)]?.name || '';
 
     // Calculate which stage the mouse is hovering over
-    const chartRect = bar.parentElement.getBoundingClientRect();
-    const mouseX = e.clientX - chartRect.left;
-    const mousePercent = (mouseX / chartRect.width) * 100;
-    const hoveredStage = getStageAtPosition(mousePercent);
-
     // Highlight predecessors and successors
     highlightDependencies(actId, predIds, succs.map(s => s.activity.id));
 
@@ -1025,9 +1022,13 @@ function showTooltip(e) {
     if (act.deliverableDetails?.trim()) html += `<div class="tooltip-section"><div class="tooltip-section-title">📄 Deliverable</div><div class="tooltip-text">${act.deliverableDetails}</div></div>`;
     if (act.notes?.trim()) html += `<div class="tooltip-section"><div class="tooltip-section-title">📝 Notes</div><div class="tooltip-text">${act.notes}</div></div>`;
 
-    // Show stage-specific note if hovering over a stage with notes
-    if (hoveredStage && act.stageNotes && act.stageNotes[hoveredStage.id]) {
-        html += `<div class="tooltip-section tooltip-stage-note"><div class="tooltip-section-title">🔖 ${hoveredStage.name} Notes</div><div class="tooltip-text">${act.stageNotes[hoveredStage.id]}</div></div>`;
+    // Show all stage-specific notes
+    if (act.stageNotes && Object.keys(act.stageNotes).length > 0) {
+        ganttData.stages.forEach(stage => {
+            if (act.stageNotes[stage.id]?.trim()) {
+                html += `<div class="tooltip-section tooltip-stage-note"><div class="tooltip-section-title">🔖 ${stage.name}</div><div class="tooltip-text">${act.stageNotes[stage.id]}</div></div>`;
+            }
+        });
     }
 
     tooltip.innerHTML = html;
