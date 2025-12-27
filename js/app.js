@@ -2124,6 +2124,9 @@ function openSlidePanel(slId, secId, actId) {
         deliverableDetailsSection.style.display = (deliverableBadge && !deliverableBadge.classList.contains('inactive')) ? '' : 'none';
     }
 
+    // Populate Stage-Specific Notes section
+    populateStageNotesSection(act);
+
     // Initialize max-height for all form section contents (for collapse animation)
     document.querySelectorAll('.form-section-content').forEach(content => {
         if (!content.classList.contains('collapsed')) {
@@ -2238,6 +2241,92 @@ document.addEventListener('keydown', function(e) {
 
 // RACI functions removed - now using actor-based RACI model
 
+// ===== STAGE-SPECIFIC NOTES =====
+
+function populateStageNotesSection(act) {
+    const section = document.getElementById('slide-stage-notes-section');
+    const listContainer = document.getElementById('slide-stage-notes-list');
+
+    if (!act || act.isGate) {
+        section.style.display = 'none';
+        return;
+    }
+
+    // Calculate which stages this activity spans
+    const totalStages = ganttData.stages.length;
+    const stageDuration = 100 / totalStages;
+    const spannedStages = [];
+
+    ganttData.stages.forEach(stage => {
+        const stageNum = parseInt(stage.num);
+        const stageStart = stageNum * stageDuration;
+        const stageEnd = (stageNum + 1) * stageDuration;
+
+        // Check if activity overlaps with this stage
+        const overlaps = (act.start < stageEnd && act.end > stageStart);
+        if (overlaps) {
+            spannedStages.push(stage);
+        }
+    });
+
+    // Only show section if activity spans stages
+    if (spannedStages.length === 0) {
+        section.style.display = 'none';
+        return;
+    }
+
+    section.style.display = '';
+
+    // Initialize stageNotes if it doesn't exist
+    if (!act.stageNotes) {
+        act.stageNotes = {};
+    }
+
+    // Render stage note inputs
+    let html = '';
+    spannedStages.forEach(stage => {
+        const noteValue = act.stageNotes[stage.id] || '';
+        html += `
+            <div class="form-group" style="margin-bottom: 16px;">
+                <label style="font-weight: 600; color: ${stage.color};">${stage.name}</label>
+                <textarea
+                    id="stage-note-${stage.id}"
+                    data-stage-id="${stage.id}"
+                    class="stage-note-input"
+                    placeholder="Notes specific to this activity in ${stage.name}..."
+                    style="min-height: 60px;"
+                >${noteValue}</textarea>
+            </div>
+        `;
+    });
+
+    listContainer.innerHTML = html;
+}
+
+function saveStageNotes(act) {
+    if (!act || act.isGate) return;
+
+    // Initialize if needed
+    if (!act.stageNotes) {
+        act.stageNotes = {};
+    }
+
+    // Collect all stage note inputs
+    document.querySelectorAll('.stage-note-input').forEach(textarea => {
+        const stageId = textarea.dataset.stageId;
+        const value = textarea.value.trim();
+
+        if (value) {
+            act.stageNotes[stageId] = value;
+        } else {
+            // Remove empty notes
+            delete act.stageNotes[stageId];
+        }
+    });
+}
+
+// ===== END STAGE-SPECIFIC NOTES =====
+
 function saveSlidePanel(shouldClose = true) {
     if (!slidePanelActivity) return;
     
@@ -2343,6 +2432,9 @@ function saveSlidePanel(shouldClose = true) {
     act.notes = newNotes;
     act.start = newStart;
     act.end = newEnd;
+
+    // Save stage-specific notes
+    saveStageNotes(act);
     act.startStage = percentToStage(newStart);
     act.endStage = percentToStage(newEnd);
     act.predecessors = newPredecessors;
