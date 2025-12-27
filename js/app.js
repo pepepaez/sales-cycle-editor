@@ -1027,7 +1027,7 @@ function showTooltip(e) {
 
     // Show stage-specific note if hovering over a stage with notes
     if (hoveredStage && act.stageNotes && act.stageNotes[hoveredStage.id]) {
-        html += `<div class="tooltip-section" style="background: rgba(255, 211, 61, 0.1); border-left: 3px solid #ffd33d;"><div class="tooltip-section-title">🔖 ${hoveredStage.name} Notes</div><div class="tooltip-text">${act.stageNotes[hoveredStage.id]}</div></div>`;
+        html += `<div class="tooltip-section tooltip-stage-note"><div class="tooltip-section-title">🔖 ${hoveredStage.name} Notes</div><div class="tooltip-text">${act.stageNotes[hoveredStage.id]}</div></div>`;
     }
 
     tooltip.innerHTML = html;
