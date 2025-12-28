@@ -485,3 +485,11 @@
         .color-option { width: 24px; height: 24px; border-radius: 4px; cursor: pointer; border: 2px solid transparent; transition: transform 0.1s; }
         .color-option:hover { transform: scale(1.1); }
         .color-option.selected { border-color: var(--text-primary); }
+
+        /* Stage Viewer */
+        .stage-viewer { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg-primary); z-index: 1001; display: flex; flex-direction: column; }
+        .stage-viewer-header { padding: 16px 24px; border-bottom: 1px solid var(--border); background: var(--bg-card); display: flex; justify-content: space-between; align-items: center; }
+        .stage-selector { display: flex; align-items: center; gap: 12px; }
+        .stage-selector label { font-size: var(--chart-text-size); font-weight: 600; color: var(--text-primary); }
+        .stage-selector select { padding: 8px 16px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary); font-size: var(--chart-text-size); font-family: inherit; cursor: pointer; }
+        .stage-viewer-gantt { flex: 1; overflow: auto; }

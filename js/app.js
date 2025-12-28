@@ -1224,8 +1224,8 @@ function getActivity(slId, secId, actId) {
     const sl = ganttData.swimlanes.find(s => s.id === slId);
     if (!sl) return null;
 
-    // If secId is null, look in swimlane's direct activities
-    if (secId === null) {
+    // If secId is null or empty string, look in swimlane's direct activities
+    if (!secId || secId === null || secId === '') {
         return sl.activities?.find(a => a.id === actId);
     }
 
@@ -3422,6 +3422,312 @@ function resetToDefault() {
         markAsSaved();
         render();
     }
+}
+
+// Stage Viewer Functions
+let selectedStageForViewer = null;
+let selectedActivityInViewer = null;
+
+function toggleStageViewer() {
+    const viewer = document.getElementById('stage-viewer');
+    const mainContainer = document.querySelector('.container');
+
+    const isHidden = viewer.style.display === 'none' || viewer.style.display === '';
+
+    if (isHidden) {
+        // Show stage viewer
+        console.log('Opening stage viewer. Total stages:', ganttData.stages.length, 'Total swimlanes:', ganttData.swimlanes.length);
+
+        viewer.style.display = 'flex';
+        mainContainer.style.display = 'none';
+
+        // Populate stage selector
+        const selector = document.getElementById('stage-viewer-selector');
+        console.log('Selector element found:', selector !== null);
+        console.log('ganttData.stages:', ganttData.stages);
+
+        if (selector && ganttData.stages && ganttData.stages.length > 0) {
+            selector.innerHTML = ganttData.stages.map(stage =>
+                `<option value="${stage.id}">${stage.num}. ${stage.name}</option>`
+            ).join('');
+
+            console.log('Stage options created:', selector.innerHTML);
+
+            // Select first stage and update view
+            selectedStageForViewer = ganttData.stages[0].id;
+            updateStageView();
+        } else {
+            console.error('Error: selector or stages missing', {
+                selectorExists: selector !== null,
+                stagesLength: ganttData.stages ? ganttData.stages.length : 0
+            });
+        }
+    } else {
+        // Hide stage viewer
+        viewer.style.display = 'none';
+        mainContainer.style.display = 'block';
+        selectedActivityInViewer = null;
+    }
+}
+
+function updateStageView() {
+    const selector = document.getElementById('stage-viewer-selector');
+    selectedStageForViewer = selector.value;
+    selectedActivityInViewer = null; // Clear selection when changing stages
+
+    const stage = ganttData.stages.find(s => s.id === selectedStageForViewer);
+    if (!stage) return;
+
+    const stageIndex = ganttData.stages.findIndex(s => s.id === selectedStageForViewer);
+    const stageWidth = 100 / ganttData.stages.length;
+    const stageStart = stageIndex * stageWidth;
+    const stageEnd = (stageIndex + 1) * stageWidth;
+
+    console.log('Stage View Debug:', {
+        stageId: selectedStageForViewer,
+        stageIndex,
+        stageWidth,
+        stageStart,
+        stageEnd,
+        totalStages: ganttData.stages.length
+    });
+
+    // Find all activities that overlap with this stage
+    const activities = [];
+    ganttData.swimlanes.forEach(sl => {
+        // Swimlane-level activities
+        if (sl.activities) {
+            sl.activities.forEach(act => {
+                if (act.start < stageEnd && act.end > stageStart) {
+                    activities.push({
+                        ...act,
+                        swimlaneName: sl.name,
+                        sectionName: null,
+                        swimlaneId: sl.id,
+                        sectionId: null
+                    });
+                }
+            });
+        }
+
+        // Section activities
+        if (sl.sections) {
+            sl.sections.forEach(sec => {
+                sec.activities.forEach(act => {
+                    if (act.start < stageEnd && act.end > stageStart) {
+                        activities.push({
+                            ...act,
+                            swimlaneName: sl.name,
+                            sectionName: sec.name,
+                            swimlaneId: sl.id,
+                            sectionId: sec.id
+                        });
+                    }
+                });
+            });
+        }
+    });
+
+    console.log('Stage viewer: Found', activities.length, 'activities for stage', stage.name, '(' + stageStart.toFixed(2) + '% - ' + stageEnd.toFixed(2) + '%)');
+
+    // Render activities
+    renderStageActivities(activities, stage, stageStart, stageEnd, stageWidth);
+
+    // Clear details panel
+    document.getElementById('stage-viewer-details').innerHTML = `
+        <div class="empty-state">
+            <p>Please select an activity</p>
+        </div>
+    `;
+}
+
+function renderStageActivities(activities, stage, stageStart, stageEnd, stageWidth) {
+    const container = document.getElementById('stage-viewer-activities');
+
+    if (activities.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>No activities in this stage</p></div>';
+        return;
+    }
+
+    container.innerHTML = activities.map(act => {
+        const extendsLeft = act.start < stageStart;
+        const extendsRight = act.end > stageEnd;
+
+        // Calculate visible portion within stage
+        const visibleStart = Math.max(act.start, stageStart);
+        const visibleEnd = Math.min(act.end, stageEnd);
+        const visibleLeft = ((visibleStart - stageStart) / stageWidth) * 100;
+        const visibleWidth = ((visibleEnd - visibleStart) / stageWidth) * 100;
+
+        // Get activity type info
+        const activityType = act.activityType ? ganttData.activityTypes.find(t => t.id === act.activityType) : null;
+        const typeColor = activityType ? activityType.color : '#58a6ff';
+
+        // Get actor info
+        const accountableActor = act.accountable ? ganttData.actors.find(a => a.id === act.accountable) : null;
+
+        // Build flags
+        const flags = [];
+        if (act.isGate) flags.push('G');
+        if (act.isDeliverable) flags.push('D');
+        if (hasFriction(act)) flags.push('⚠');
+        if (hasStageNotes(act)) flags.push('📝');
+
+        // Build meta info
+        const metaItems = [];
+        if (act.sectionName) metaItems.push(`📂 ${act.sectionName}`);
+        else metaItems.push(`📂 ${act.swimlaneName}`);
+        if (activityType) metaItems.push(`🏷 ${activityType.name}`);
+        if (accountableActor) metaItems.push(`👤 ${accountableActor.name}`);
+
+        return `
+            <div class="stage-activity-card" data-activity-id="${act.id}" data-swimlane-id="${act.swimlaneId}" data-section-id="${act.sectionId || ''}" onclick="selectActivityInViewer('${act.id}', '${act.swimlaneId}', '${act.sectionId || ''}')">
+                <div class="stage-activity-header">
+                    <div class="stage-activity-title">${act.name}</div>
+                    <div class="stage-activity-badges">
+                        ${flags.map(f => `<span class="activity-badge">${f}</span>`).join('')}
+                    </div>
+                </div>
+
+                <div class="stage-activity-bar">
+                    ${extendsLeft ? '<span class="stage-activity-bar-extend-left">←</span>' : ''}
+                    <div class="stage-activity-bar-fill" style="left: ${visibleLeft}%; width: ${visibleWidth}%; background: ${typeColor};">
+                        ${act.isDeliverable ? '<span style="margin-right: 4px;">D</span>' : ''}
+                        ${act.predecessor ? '<span style="margin-right: 4px;">⛓</span>' : ''}
+                        ${hasFriction(act) ? '<span style="margin-right: 4px;">⚠</span>' : ''}
+                        ${hasStageNotes(act) ? '<span style="margin-right: 4px;">📝</span>' : ''}
+                    </div>
+                    ${extendsRight ? '<span class="stage-activity-bar-extend-right">→</span>' : ''}
+                </div>
+
+                <div class="stage-activity-meta">
+                    ${metaItems.map(item => `<span class="stage-activity-meta-item">${item}</span>`).join('')}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function selectActivityInViewer(actId, slId, secId) {
+    selectedActivityInViewer = { actId, slId, secId };
+
+    // Update card selection styles
+    document.querySelectorAll('.stage-activity-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    document.querySelector(`.stage-activity-card[data-activity-id="${actId}"]`).classList.add('selected');
+
+    // Get activity data
+    const activity = getActivity(slId, secId, actId);
+    if (!activity) return;
+
+    // Render activity details
+    renderActivityDetails(activity);
+}
+
+function renderActivityDetails(act) {
+    const detailsContainer = document.getElementById('stage-viewer-details');
+
+    // Get related data
+    const activityType = act.activityType ? ganttData.activityTypes.find(t => t.id === act.activityType) : null;
+    const accountableActor = act.accountable ? ganttData.actors.find(a => a.id === act.accountable) : null;
+    const responsibleActors = (act.responsible || []).map(id => ganttData.actors.find(a => a.id === id)).filter(Boolean);
+    const consultedActors = (act.consulted || []).map(id => ganttData.actors.find(a => a.id === id)).filter(Boolean);
+    const informedActors = (act.informed || []).map(id => ganttData.actors.find(a => a.id === id)).filter(Boolean);
+    const gateOwner = act.gateOwner ? ganttData.actors.find(a => a.id === act.gateOwner) : null;
+
+    // Get predecessor/successor info
+    const predecessor = act.predecessor ? findActivityById(act.predecessor) : null;
+    const successors = getSuccessors(act.id);
+
+    // Build stage notes section
+    let stageNotesHtml = '';
+    if (act.stageNotes && Object.keys(act.stageNotes).length > 0) {
+        const stageIndex = ganttData.stages.findIndex(s => s.id === selectedStageForViewer);
+        const currentStageNote = act.stageNotes[stageIndex];
+
+        if (currentStageNote && currentStageNote.trim()) {
+            stageNotesHtml = `
+                <div class="stage-detail-section">
+                    <div class="stage-detail-section-title">Stage-Specific Notes</div>
+                    <div class="stage-detail-section-content">${currentStageNote}</div>
+                </div>
+            `;
+        }
+    }
+
+    detailsContainer.innerHTML = `
+        <div class="stage-viewer-details-content">
+            <div class="stage-detail-title">${act.name}</div>
+
+            ${act.isGate ? `
+                <div class="stage-detail-section">
+                    <div class="stage-detail-section-title">Exit Gate</div>
+                    <div class="stage-detail-section-content">
+                        ${gateOwner ? `Gate Owner: ${gateOwner.name}` : 'No gate owner assigned'}
+                    </div>
+                </div>
+            ` : ''}
+
+            ${activityType ? `
+                <div class="stage-detail-section">
+                    <div class="stage-detail-section-title">Activity Type</div>
+                    <div class="stage-detail-section-content">
+                        <span style="display: inline-block; width: 12px; height: 12px; border-radius: 2px; background: ${activityType.color}; margin-right: 6px;"></span>
+                        ${activityType.name}
+                    </div>
+                </div>
+            ` : ''}
+
+            ${!act.isGate && (accountableActor || responsibleActors.length || consultedActors.length || informedActors.length) ? `
+                <div class="stage-detail-section">
+                    <div class="stage-detail-section-title">RACI Assignments</div>
+                    <div class="stage-detail-section-content">
+                        ${accountableActor ? `<div><strong>Accountable:</strong> ${accountableActor.name}</div>` : ''}
+                        ${responsibleActors.length ? `<div><strong>Responsible:</strong> ${responsibleActors.map(a => a.name).join(', ')}</div>` : ''}
+                        ${consultedActors.length ? `<div><strong>Consulted:</strong> ${consultedActors.map(a => a.name).join(', ')}</div>` : ''}
+                        ${informedActors.length ? `<div><strong>Informed:</strong> ${informedActors.map(a => a.name).join(', ')}</div>` : ''}
+                    </div>
+                </div>
+            ` : ''}
+
+            ${act.isDeliverable && act.deliverableDetails ? `
+                <div class="stage-detail-section">
+                    <div class="stage-detail-section-title">Deliverable Details</div>
+                    <div class="stage-detail-section-content">${act.deliverableDetails}</div>
+                </div>
+            ` : ''}
+
+            ${hasFriction(act) ? `
+                <div class="stage-detail-section">
+                    <div class="stage-detail-section-title">Friction Point</div>
+                    <div class="stage-detail-section-content">
+                        <div><strong>Issue:</strong> ${act.friction}</div>
+                        ${act.resolution ? `<div style="margin-top: 8px;"><strong>Resolution:</strong> ${act.resolution}</div>` : ''}
+                    </div>
+                </div>
+            ` : ''}
+
+            ${predecessor || successors.length ? `
+                <div class="stage-detail-section">
+                    <div class="stage-detail-section-title">Dependencies</div>
+                    <div class="stage-detail-section-content">
+                        ${predecessor ? `<div><strong>Predecessor:</strong> ${predecessor.name}</div>` : ''}
+                        ${successors.length ? `<div><strong>Successors:</strong> ${successors.map(s => s.name).join(', ')}</div>` : ''}
+                    </div>
+                </div>
+            ` : ''}
+
+            ${stageNotesHtml}
+
+            ${act.notes ? `
+                <div class="stage-detail-section">
+                    <div class="stage-detail-section-title">General Notes</div>
+                    <div class="stage-detail-section-content">${act.notes}</div>
+                </div>
+            ` : ''}
+        </div>
+    `;
 }
 
 // Initialize beforeunload warning

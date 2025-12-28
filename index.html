@@ -37,6 +37,11 @@
 
                 <span class="toolbar-separator">|</span>
 
+                <!-- Views -->
+                <button class="btn" onclick="toggleStageViewer()">Stage Viewer</button>
+
+                <span class="toolbar-separator">|</span>
+
                 <!-- Theming -->
                 <button class="theme-toggle" onclick="toggleTheme()">
                     <span id="theme-icon">🌙</span>
@@ -66,7 +71,29 @@
             </div>
         </div>
     </div>
-    
+
+    <!-- Stage Viewer -->
+    <div class="stage-viewer" id="stage-viewer" style="display: none;">
+        <div class="stage-viewer-header">
+            <div class="stage-selector">
+                <label>Filter by Stage:</label>
+                <select id="stage-viewer-selector" onchange="updateStageView()">
+                    <!-- Will be populated dynamically -->
+                </select>
+            </div>
+            <button class="btn" onclick="toggleStageViewer()">Close Viewer</button>
+        </div>
+
+        <div class="stage-viewer-gantt">
+            <div class="gantt-wrapper">
+                <div class="gantt-inner" id="stage-viewer-gantt-inner">
+                    <div class="stage-headers" id="stage-viewer-stage-headers"></div>
+                    <div id="stage-viewer-gantt-content"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="tooltip" id="tooltip"></div>
     
     <!-- Activity Modal -->
