@@ -8,55 +8,41 @@
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-    <div class="top-header">
-        <div class="header-content">
-            <div class="title-block">
-                <h1>Sales Cycle Interactive Editor</h1>
-                <div class="filename-group" style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
-                    <div class="filename-display" style="padding: 12px 20px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-card); color: var(--text); font-size: 20px; font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                        <span id="project-filename">Editor Tutorial.json</span>
-                    </div>
-                    <span id="unsaved-indicator" style="color: #ff6b6b; font-weight: 500; display: none; font-size: 18px;">●</span>
-                </div>
-            </div>
-            <div class="toolbar">
-                <!-- File Management -->
-                <button class="btn" onclick="createNew()">New</button>
-                <button class="btn" onclick="document.getElementById('file-input').click()">Open</button>
-                <button class="btn primary" onclick="saveToLocalStorage()">Save</button>
-                <button class="btn primary" onclick="exportJSON()">Save As</button>
-                <button class="btn danger" onclick="resetToDefault()">Reset</button>
-                <input type="file" id="file-input" class="file-input" accept=".json" onchange="importJSON(event)">
+    <div class="top-header" style="background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 8px 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <h1 style="margin: 0; font-size: 14px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Sales Cycle Editor</h1>
+            <div style="font-size: 14px; color: var(--text-primary); font-weight: 600;"><span id="project-filename">Editor Tutorial.json</span></div>
+            <span id="unsaved-indicator" style="color: #ff6b6b; font-weight: 500; display: none; font-size: 14px;">●</span>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <!-- File Management -->
+            <button class="btn" onclick="createNew()">New</button>
+            <button class="btn" onclick="document.getElementById('file-input').click()">Open</button>
+            <button class="btn primary" onclick="saveToLocalStorage()">Save</button>
+            <button class="btn primary" onclick="exportJSON()">Save As</button>
+            <button class="btn danger" onclick="resetToDefault()">Reset</button>
+            <input type="file" id="file-input" class="file-input" accept=".json" onchange="importJSON(event)">
 
-                <span class="toolbar-separator">|</span>
+            <span class="toolbar-separator">|</span>
 
-                <!-- Data Management -->
-                <button class="btn" onclick="openStagesModal()">Stages</button>
-                <button class="btn" onclick="openActorsModal()">Actors</button>
-                <button class="btn" onclick="openActivityTypesModal()">Activity Types</button>
+            <!-- Data Management -->
+            <button class="btn" onclick="openStagesModal()">Stages</button>
+            <button class="btn" onclick="openActorsModal()">Actors</button>
+            <button class="btn" onclick="openActivityTypesModal()">Activity Types</button>
 
-                <span class="toolbar-separator">|</span>
+            <span class="toolbar-separator">|</span>
 
-                <!-- Views -->
-                <button class="btn" onclick="toggleStageViewer()">Stage Viewer</button>
-
-                <span class="toolbar-separator">|</span>
-
-                <!-- Theming -->
-                <button class="theme-toggle" onclick="toggleTheme()">
-                    <span id="theme-icon">🌙</span>
-                    <span id="theme-label">Dark</span>
-                </button>
-                <div class="text-size-control" style="display: flex; align-items: center; gap: 8px;">
-                    <label style="font-size: 14px; color: var(--text-muted);">Text Size:</label>
-                    <select id="text-size-selector" onchange="changeTextSize()" style="padding: 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--input-bg); color: var(--text); font-size: 14px;">
-                        <option value="12">Small</option>
-                        <option value="14" selected>Medium</option>
-                        <option value="16">Large</option>
-                        <option value="18">X-Large</option>
-                    </select>
-                </div>
-            </div>
+            <!-- Theming -->
+            <button class="theme-toggle" onclick="toggleTheme()">
+                <span id="theme-icon">🌙</span>
+                <span id="theme-label">Dark</span>
+            </button>
+            <select id="text-size-selector" onchange="changeTextSize()" style="padding: 6px 12px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-secondary); color: var(--text-primary); font-size: 13px; font-weight: 500; cursor: pointer;">
+                <option value="12">Small</option>
+                <option value="14" selected>Medium</option>
+                <option value="16">Large</option>
+                <option value="18">X-Large</option>
+            </select>
         </div>
     </div>
     
@@ -331,6 +317,19 @@
                         <label>Deliverable Details</label>
                         <textarea id="slide-deliverable-details" placeholder="What is produced by this activity..."></textarea>
                     </div>
+                </div>
+            </div>
+            <div class="form-section">
+                <div class="form-section-title checklist" onclick="toggleFormSection(this)">
+                    <span id="checklist-section-title">✓ Checklist</span>
+                    <span class="section-collapse">▸</span>
+                </div>
+                <div class="form-section-content">
+                    <div style="margin-bottom: 12px; color: var(--text-muted); font-size: 13px;">
+                        <span id="checklist-description">Add items that need to be checked during or at the end of this activity</span>
+                    </div>
+                    <div id="slide-checklist-items" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;"></div>
+                    <button class="btn" onclick="addChecklistItem()" style="width: 100%;">+ Add Item</button>
                 </div>
             </div>
             <div class="form-section" id="slide-stage-notes-section" style="display:none;">

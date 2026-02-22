@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales Cycle Stage Viewer</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        /* Viewer-specific styles */
+        .viewer-header {
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            padding: 8px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .viewer-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .viewer-title h1 {
+            margin: 0;
+            font-size: 14px;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .viewer-title .project-name {
+            font-size: 14px;
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .stage-tabs {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .stage-tab {
+            padding: 10px 20px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--bg-secondary);
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+            font-size: 14px;
+            opacity: 0.6;
+        }
+
+        .stage-tab:hover {
+            background: var(--bg-card);
+            border-color: var(--text-muted);
+            opacity: 0.8;
+        }
+
+        .stage-tab.active {
+            background: var(--bg-card);
+            color: var(--text-primary);
+            border: 2px solid currentColor;
+            font-weight: 700;
+            opacity: 1;
+        }
+
+        .kanban-board {
+            display: flex;
+            gap: 20px;
+            padding: 24px;
+            overflow-x: auto;
+            height: calc(100vh - 90px);
+        }
+
+        .kanban-column {
+            flex: 1 1 0;
+            min-width: 280px;
+            max-width: none;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .column-resize-handle {
+            position: absolute;
+            top: 0;
+            right: -6px;
+            width: 12px;
+            height: 100%;
+            cursor: col-resize;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .column-resize-handle::after {
+            content: '';
+            width: 2px;
+            height: 40px;
+            background: var(--border);
+            border-radius: 2px;
+            transition: background 0.2s;
+        }
+
+        .column-resize-handle:hover::after {
+            background: var(--text-muted);
+        }
+
+        .kanban-column-header {
+            padding: 20px 16px;
+            border-bottom: 3px solid;
+            background: var(--bg-primary);
+            border-radius: 8px 8px 0 0;
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+
+        .kanban-column-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin: 0 0 8px 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .kanban-column-count {
+            font-weight: 500;
+            opacity: 0.8;
+        }
+
+        .kanban-cards {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .activity-card {
+            background: var(--bg-card);
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .activity-card:hover {
+            border-color: var(--text-muted);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .card-header-left {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .card-header-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .card-type-badge {
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            white-space: nowrap;
+        }
+
+        .card-gate-owner {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .gate-owner-box {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 700;
+            color: white;
+        }
+
+        .gate-owner-label {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+        }
+
+        .card-type-indicator {
+            width: 4px;
+            min-height: 100%;
+            border-radius: 2px;
+            align-self: stretch;
+        }
+
+        .card-title-section {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .card-title {
+            font-weight: 600;
+            margin: 0 0 6px 0;
+            line-height: 1.3;
+            color: white !important;
+        }
+
+        html.light .card-title {
+            color: black !important;
+        }
+
+        .card-badges {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .card-badge {
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .card-badge.type {
+            background: transparent;
+            border: 1px solid;
+        }
+
+        .card-badge.deliverable {
+            background: rgba(121, 192, 255, 0.2);
+            color: #79c0ff;
+        }
+
+        .card-badge.gate {
+            background: rgba(248, 81, 73, 0.2);
+            color: #f85149;
+        }
+
+        /* RACI Matrix */
+        .raci-matrix {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 4px;
+            flex-shrink: 0;
+            min-width: 80px;
+        }
+
+        .raci-matrix-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 4px;
+            background: var(--bg-secondary);
+            border-radius: 4px;
+        }
+
+        .raci-actor-box {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 700;
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .raci-role-label {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+        }
+
+        /* Info rows */
+        .card-info-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            background: var(--bg-secondary);
+            border-radius: 6px;
+        }
+
+        .info-icon {
+            font-size: 16px;
+        }
+
+        .info-label {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .info-value {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        /* Stage notes */
+        .card-stage-notes {
+            background: var(--bg-secondary);
+            padding: 10px 12px;
+            border-radius: 6px;
+            border-left: 4px solid white;
+        }
+
+        html.light .card-stage-notes {
+            border-left-color: black;
+        }
+
+        .stage-notes-header {
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 6px;
+            letter-spacing: 0.3px;
+        }
+
+        /* General notes */
+        .card-general-notes {
+            background: var(--bg-secondary);
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-style: italic;
+        }
+
+        .card-notes-text {
+            color: white;
+            line-height: 1.5;
+            margin: 0;
+        }
+
+        html.light .card-notes-text {
+            color: black;
+        }
+
+        /* Settings Modal specific styles */
+        #settings-modal .modal {
+            width: 480px;
+        }
+
+        #settings-modal .checkbox-item {
+            padding: 8px;
+            border-radius: 6px;
+            transition: background 0.2s;
+        }
+
+        #settings-modal .checkbox-item:hover {
+            background: var(--bg-card);
+        }
+
+        #settings-modal .checkbox-item span {
+            font-size: 14px;
+            color: var(--text-primary);
+        }
+
+        /* Deliverable section */
+        .card-section {
+            padding: 10px 12px;
+            background: var(--bg-secondary);
+            border-radius: 6px;
+            border-left: 3px solid #79c0ff;
+        }
+
+        .card-section-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: #79c0ff;
+            margin-bottom: 6px;
+            letter-spacing: 0.3px;
+        }
+
+        /* Friction section */
+        .card-section.friction {
+            border-left-color: #f85149;
+        }
+
+        .card-section.friction .card-section-title {
+            color: #f85149;
+        }
+
+        /* Gate owner section */
+        .card-section.gate-owner {
+            border-left-color: #f85149;
+        }
+
+        .card-section.gate-owner .card-section-title {
+            color: #f85149;
+        }
+
+        /* Swimlane indicator */
+        .card-swimlane-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: var(--bg-secondary);
+            border-radius: 6px;
+            border-left: 3px solid;
+            font-size: 13px;
+        }
+
+        .swimlane-label {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .swimlane-name {
+            font-weight: 600;
+        }
+
+        /* Gates column styling */
+        .gates-column {
+            border: 2px solid rgba(248, 81, 73, 0.3);
+        }
+
+        .empty-column {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 200px;
+            color: var(--text-muted);
+            font-style: italic;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .file-input-container {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .font-size-selector {
+            padding: 6px 12px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .font-size-selector:hover {
+            background: var(--bg-card);
+            border-color: var(--text-muted);
+        }
+
+        /* Base font size system */
+        :root {
+            --base-font-size: 13px;
+        }
+
+        body {
+            --base-font-size: 13px;
+        }
+
+        /* Card text elements - all scale based on base font size */
+        .card-title {
+            font-size: calc(var(--base-font-size) + 2px);
+        }
+
+        .card-badge {
+            font-size: calc(var(--base-font-size) - 2px);
+        }
+
+        .card-notes-text {
+            font-size: var(--base-font-size);
+        }
+
+        .card-info-row {
+            font-size: var(--base-font-size);
+        }
+
+        .info-label, .info-value {
+            font-size: var(--base-font-size);
+        }
+
+        .card-type-badge {
+            font-size: calc(var(--base-font-size) - 2px);
+        }
+
+        .card-section-title {
+            font-size: calc(var(--base-font-size) - 1px);
+        }
+
+        .stage-notes-header {
+            font-size: calc(var(--base-font-size) - 1px);
+        }
+
+        .card-gate-owner .gate-owner-label {
+            font-size: calc(var(--base-font-size) - 3px);
+        }
+
+        .gate-owner-box {
+            font-size: calc(var(--base-font-size) - 3px);
+        }
+
+        .swimlane-label, .swimlane-name {
+            font-size: var(--base-font-size);
+        }
+
+        .info-icon {
+            font-size: calc(var(--base-font-size) + 3px);
+        }
+
+        .raci-actor-box {
+            font-size: calc(var(--base-font-size) - 3px);
+        }
+
+        .raci-role-label {
+            font-size: calc(var(--base-font-size) - 3px);
+        }
+
+        .kanban-column-title {
+            font-size: calc(var(--base-font-size) + 5px);
+        }
+
+        .kanban-column-count {
+            font-size: var(--base-font-size);
+        }
+
+        /* Checklist items */
+        .card-section.checklist ul li {
+            font-size: var(--base-font-size);
+        }
+
+        .stage-tab {
+            font-size: calc(var(--base-font-size) + 1px);
+        }
+
+        .card-swimlane-indicator {
+            font-size: var(--base-font-size);
+        }
+
+        .no-data-message {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: calc(100vh - 90px);
+            gap: 20px;
+            color: var(--text-muted);
+        }
+
+        .no-data-message h2 {
+            margin: 0;
+            font-size: 24px;
+        }
+
+        .no-data-message p {
+            margin: 0;
+            font-size: 16px;
+        }
+
+        /* Legend styles */
+        .legend {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .legend-header {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-right: -8px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .legend-separator {
+            width: 2px;
+            height: 20px;
+            background: var(--border);
+            margin: 0 8px;
+        }
+
+        .legend-bar {
+            width: 20px;
+            height: 8px;
+            border-radius: 2px;
+        }
+
+        /* Hide scrollbars while keeping scroll functionality */
+        .kanban-board::-webkit-scrollbar,
+        .kanban-cards::-webkit-scrollbar {
+            display: none;
+        }
+
+        .kanban-board,
+        .kanban-cards {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+    </style>
+</head>
+<body>
+    <div class="viewer-header">
+        <div class="viewer-title">
+            <h1>Sales Cycle Stage Viewer</h1>
+            <div class="project-name" id="project-name">No file loaded</div>
+        </div>
+        <div class="file-input-container">
+            <button class="btn primary" onclick="document.getElementById('json-file-input').click()">Open JSON File</button>
+            <input type="file" id="json-file-input" accept=".json" style="display: none;" onchange="loadJSONFile(event)">
+            <button class="btn" onclick="openSettingsModal()" title="Display Settings">⚙️ Settings</button>
+            <select id="font-size-selector" class="font-size-selector" onchange="changeFontSize(this.value)">
+                <option value="10">10px - Tiny</option>
+                <option value="11">11px - Very Small</option>
+                <option value="12">12px - Small</option>
+                <option value="13" selected>13px - Medium</option>
+                <option value="14">14px - Default</option>
+                <option value="15">15px - Large</option>
+                <option value="16">16px - Very Large</option>
+                <option value="18">18px - Extra Large</option>
+                <option value="20">20px - Huge</option>
+            </select>
+            <button class="theme-toggle" onclick="toggleTheme()">
+                <span id="theme-icon">🌙</span>
+                <span id="theme-label">Dark</span>
+            </button>
+        </div>
+    </div>
+
+    <div id="legend-container" style="padding: 12px 24px; border-bottom: 1px solid var(--border); display: none;">
+        <div id="legend" class="legend"></div>
+    </div>
+
+    <div id="stage-tabs-container" style="padding: 20px 32px 0; display: none;">
+        <div class="stage-tabs" id="stage-tabs"></div>
+    </div>
+
+    <div id="kanban-board" class="kanban-board" style="display: none;"></div>
+
+    <div id="no-data" class="no-data-message">
+        <h2>Welcome to the Sales Cycle Stage Viewer</h2>
+        <p>Click "Open JSON File" to load a sales cycle and view it stage-by-stage</p>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settings-modal">
+        <div class="modal small">
+            <h2>Display Settings</h2>
+            <div style="margin-bottom: 16px; color: var(--text-muted); font-size: 13px;">
+                Choose which sections to show on activity cards
+            </div>
+
+            <div class="form-section">
+                <div class="form-section-title" style="margin-bottom: 12px; font-size: 14px; font-weight: 600; color: var(--text-primary);">
+                    Card Sections
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="show-raci" checked onchange="updateDisplaySettings()">
+                        <span>RACI Matrix (Accountable, Responsible, Consulted, Informed)</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="show-gate-owner" checked onchange="updateDisplaySettings()">
+                        <span>Gate Owner (for exit gates)</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="show-dependencies" checked onchange="updateDisplaySettings()">
+                        <span>Dependencies (predecessor activities)</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="show-stage-notes" checked onchange="updateDisplaySettings()">
+                        <span>Stage-Specific Notes</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="show-checklist" checked onchange="updateDisplaySettings()">
+                        <span>Checklist / Exit Criteria</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="show-deliverable" checked onchange="updateDisplaySettings()">
+                        <span>Deliverable Details</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="show-friction" checked onchange="updateDisplaySettings()">
+                        <span>Friction Points</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="show-general-notes" checked onchange="updateDisplaySettings()">
+                        <span>General Notes</span>
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="show-swimlane" checked onchange="updateDisplaySettings()">
+                        <span>Swimlane Indicator (for exit gates)</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-section" style="margin-top: 20px;" id="lane-selection-section">
+                <div class="form-section-title" style="margin-bottom: 12px; font-size: 14px; font-weight: 600; color: var(--text-primary);">
+                    Visible Lanes
+                </div>
+                <div style="margin-bottom: 12px; color: var(--text-muted); font-size: 13px;">
+                    Choose which swimlanes to display
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 10px;" id="lane-checkboxes">
+                    <!-- Will be populated dynamically -->
+                </div>
+            </div>
+
+            <div class="modal-actions" style="margin-top: 20px;">
+                <button class="btn" onclick="closeSettingsModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/viewer.js"></script>
+</body>
+</html>

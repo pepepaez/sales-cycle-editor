@@ -395,7 +395,7 @@
         .activity-row.highlight-successor-row { background: rgba(63, 185, 80, 0.1) !important; }
         .empty-lane { padding: 16px; text-align: center; color: var(--text-muted); font-size: 12px; font-style: italic; }
         .empty-lane.drag-over { background: var(--ss-bg); border: 2px dashed var(--ss-color); border-radius: 6px; margin: 4px; }
-        .tooltip { position: fixed; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 12px; font-size: var(--chart-text-size); max-width: 340px; z-index: 1000; pointer-events: none; opacity: 0; transition: opacity 0.15s; box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+        .tooltip { position: fixed; background: var(--bg-card); border: 2px solid var(--text-muted); border-radius: 6px; padding: 12px; font-size: var(--chart-text-size); max-width: 340px; z-index: 1000; pointer-events: none; opacity: 0; transition: opacity 0.15s; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
         .tooltip.visible { opacity: 1; }
         .tooltip-title { font-weight: 600; margin-bottom: 8px; color: var(--text-primary); font-size: var(--chart-text-size); line-height: 1.4; }
         .tooltip-row { display: flex; gap: 6px; margin-bottom: 4px; color: var(--text-secondary); font-size: var(--chart-text-size); }
@@ -404,9 +404,10 @@
         .tooltip-value.predecessor { color: var(--dependency-color); }
         .tooltip-value.successor { color: var(--prospect-color); }
         .tooltip-section { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
-        .tooltip-section-title { font-weight: 600; font-size: var(--chart-text-size); color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; }
+        .tooltip-section-title { font-weight: 600; font-size: var(--chart-text-size); color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.3px; }
         .tooltip-text { font-size: var(--chart-text-size); color: var(--text-secondary); line-height: 1.4; }
-        .tooltip-stage-note { border-left: 3px solid #ffd33d; padding-left: 8px; }
+        .tooltip-stage-note { border-left: 4px solid #ffd33d; padding-left: 10px; margin-left: -2px; }
+        .tooltip-stage-note .tooltip-section-title { text-transform: none; font-size: calc(var(--chart-text-size) + 1px); letter-spacing: 0; }
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; visibility: hidden; transition: all 0.2s; }
         .modal-overlay.visible { opacity: 1; visibility: visible; }
         .modal { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 10px; padding: 20px; width: 520px; max-width: 95vw; max-height: 85vh; overflow-y: auto; }
@@ -493,3 +494,6 @@
         .stage-selector label { font-size: var(--chart-text-size); font-weight: 600; color: var(--text-primary); }
         .stage-selector select { padding: 8px 16px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary); font-size: var(--chart-text-size); font-family: inherit; cursor: pointer; }
         .stage-viewer-gantt { flex: 1; overflow: auto; }
+
+        /* Slide panel should appear above stage viewer */
+        .stage-viewer ~ .slide-panel { z-index: 1002; }

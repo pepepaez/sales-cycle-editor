@@ -458,15 +458,9 @@ function renderSwimlanes() {
         const totalActivities = swimlaneActivityCount + sectionActivityCount;
         const slColor = sl.color || '#58a6ff';
 
-        el.innerHTML = `
-            <div class="swimlane-header" style="grid-template-columns: ${ACTIVITY_COL_WIDTH}px 1fr;" data-swimlane-id="${sl.id}">
-                <div class="swimlane-label" style="color: ${slColor};position:relative;">
-                    <span class="swimlane-drag-handle" draggable="true" data-swimlane-id="${sl.id}" style="cursor:move;margin-right:6px;opacity:0.5;" title="Drag to reorder">⋮⋮</span>
-                    <div class="swimlane-label-text" onclick="toggleSwimlaneCollapse('${sl.id}')" style="cursor:pointer;">
-                        <span class="swimlane-collapse ${sl.collapsed ? 'collapsed' : ''}">▸</span>
-                        <span>${sl.name}</span>
-                        <span class="swimlane-count">${totalActivities}</span>
-                    </div>
+        // Hide UI elements in stage viewer mode
+        const swimlaneDragHandle = isStageViewerMode ? '' : `<span class="swimlane-drag-handle" draggable="true" data-swimlane-id="${sl.id}" style="cursor:move;margin-right:6px;opacity:0.5;" title="Drag to reorder">⋮⋮</span>`;
+        const swimlaneActions = isStageViewerMode ? '' : `
                     <div class="swimlane-actions">
                         <div class="swimlane-action-group">
                             <button class="add-btn swimlane-add-btn" onclick="openSectionModal('${sl.id}')" ${sl.collapsed ? 'disabled style="opacity:0.4;"' : ''}>+ Section</button>
@@ -476,8 +470,20 @@ function renderSwimlanes() {
                             <button class="add-btn swimlane-icon-btn" onclick="openEditSwimlaneModal('${sl.id}')" title="Edit">✎</button>
                             <button class="add-btn swimlane-icon-btn" onclick="deleteSwimlane('${sl.id}')" title="Delete" ${ganttData.swimlanes.length <= 1 ? 'disabled style="opacity:0.4;"' : ''}>✕</button>
                         </div>
+                    </div>`;
+        const columnResizeHandle = isStageViewerMode ? '' : `<div class="column-resize-handle" title="Drag to resize activity column"></div>`;
+
+        el.innerHTML = `
+            <div class="swimlane-header" style="grid-template-columns: ${ACTIVITY_COL_WIDTH}px 1fr;" data-swimlane-id="${sl.id}">
+                <div class="swimlane-label" style="color: ${slColor};position:relative;">
+                    ${swimlaneDragHandle}
+                    <div class="swimlane-label-text" onclick="toggleSwimlaneCollapse('${sl.id}')" style="cursor:pointer;">
+                        <span class="swimlane-collapse ${sl.collapsed ? 'collapsed' : ''}">▸</span>
+                        <span>${sl.name}</span>
+                        <span class="swimlane-count">${totalActivities}</span>
                     </div>
-                    <div class="column-resize-handle" title="Drag to resize activity column"></div>
+                    ${swimlaneActions}
+                    ${columnResizeHandle}
                 </div>
                 <div class="stage-dividers" style="grid-template-columns: ${stageCols};">${dividers}</div>
             </div>
@@ -489,36 +495,43 @@ function renderSwimlanes() {
         container.appendChild(el);
     });
 
-    // Add "Add Swimlane" button at the end
-    const addBtn = document.createElement('div');
-    addBtn.className = 'add-swimlane-row';
-    addBtn.innerHTML = `<button class="btn" onclick="openAddSwimlaneModal()">+ Add Swimlane</button>`;
-    container.appendChild(addBtn);
+    // Add "Add Swimlane" button at the end (not in viewer mode)
+    if (!isStageViewerMode) {
+        const addBtn = document.createElement('div');
+        addBtn.className = 'add-swimlane-row';
+        addBtn.innerHTML = `<button class="btn" onclick="openAddSwimlaneModal()">+ Add Swimlane</button>`;
+        container.appendChild(addBtn);
+    }
 }
 
 function renderSection(sl, sec, stageCols) {
     const stageCount = ganttData.stages.length;
     let chartBgs = '';
     for (let i = 0; i < stageCount; i++) chartBgs += '<div class="section-chart-bg"></div>';
-    
+
     const actCount = sec.activities.length;
-    let activitiesHtml = actCount === 0 
-        ? `<div class="empty-lane" data-section-id="${sec.id}" data-swimlane-id="${sl.id}">Drop activities here or click "+ Activity" on this section</div>` 
+    let activitiesHtml = actCount === 0
+        ? `<div class="empty-lane" data-section-id="${sec.id}" data-swimlane-id="${sl.id}">Drop activities here or click "+ Activity" on this section</div>`
         : sec.activities.map(act => renderActivityRow(sl, sec, act, stageCols)).join('');
-    
-    return `
-        <div class="section-group" data-section-id="${sec.id}" data-swimlane-id="${sl.id}">
-            <div class="section-header" data-section-id="${sec.id}" data-swimlane-id="${sl.id}" style="grid-template-columns: ${ACTIVITY_COL_WIDTH}px 1fr;">
-                <div class="section-label" onclick="toggleSectionCollapse('${sl.id}', '${sec.id}')">
-                    <span class="section-drag-handle" draggable="true" data-section-id="${sec.id}" data-swimlane-id="${sl.id}">☰</span>
-                    <span class="section-collapse ${sec.collapsed ? 'collapsed' : ''}">▸</span>
-                    <span class="section-name">${sec.name}</span>
-                    <span class="section-count">${actCount}</span>
+
+    // Hide section UI elements in viewer mode
+    const sectionDragHandle = isStageViewerMode ? '' : `<span class="section-drag-handle" draggable="true" data-section-id="${sec.id}" data-swimlane-id="${sl.id}">☰</span>`;
+    const sectionActions = isStageViewerMode ? '' : `
                     <div class="section-actions">
                         <button class="section-action-btn" onclick="event.stopPropagation();openAddActivityToSectionModal('${sl.id}','${sec.id}')" title="Add Activity">+</button>
                         <button class="section-action-btn" onclick="event.stopPropagation();openEditSectionModal('${sl.id}','${sec.id}')" title="Edit">✎</button>
                         <button class="section-action-btn delete" onclick="event.stopPropagation();deleteSection('${sl.id}','${sec.id}')" title="Delete">✕</button>
-                    </div>
+                    </div>`;
+
+    return `
+        <div class="section-group" data-section-id="${sec.id}" data-swimlane-id="${sl.id}">
+            <div class="section-header" data-section-id="${sec.id}" data-swimlane-id="${sl.id}" style="grid-template-columns: ${ACTIVITY_COL_WIDTH}px 1fr;">
+                <div class="section-label" onclick="toggleSectionCollapse('${sl.id}', '${sec.id}')">
+                    ${sectionDragHandle}
+                    <span class="section-collapse ${sec.collapsed ? 'collapsed' : ''}">▸</span>
+                    <span class="section-name">${sec.name}</span>
+                    <span class="section-count">${actCount}</span>
+                    ${sectionActions}
                 </div>
                 <div class="section-chart" style="grid-template-columns: ${stageCols};">${chartBgs}</div>
             </div>
@@ -613,9 +626,13 @@ function renderActivityRow(sl, sec, act, stageCols) {
         if (hasFriction(act)) indicators += '<div class="bar-indicator friction">⚠</div>';
         if (hasStageNotes(act)) indicators += '<div class="bar-indicator notes">📝</div>';
 
-        barHtml = `<div class="bar" style="left:${act.start}%;width:${width}%;background:${barBg};border:1.5px solid ${barBorder};" data-swimlane="${sl.id}" data-section="${secId}" data-activity="${act.id}">
+        // Only show resize handles if not in stage viewer mode
+        const resizeHandles = isStageViewerMode ? '' : `
             <div class="resize-handle left" data-handle="left"></div>
-            <div class="resize-handle right" data-handle="right"></div>
+            <div class="resize-handle right" data-handle="right"></div>`;
+
+        barHtml = `<div class="bar" style="left:${act.start}%;width:${width}%;background:${barBg};border:1.5px solid ${barBorder};" data-swimlane="${sl.id}" data-section="${secId}" data-activity="${act.id}">
+            ${resizeHandles}
             ${raciBoxes ? `<div class="raci-boxes">${raciBoxes}</div>` : ''}
             ${indicators ? `<div class="bar-indicators">${indicators}</div>` : ''}
         </div>`;
@@ -624,22 +641,29 @@ function renderActivityRow(sl, sec, act, stageCols) {
     // No badges needed since we show RACI on the bars
     let raciBadges = '';
 
+    // In viewer mode, hide actions and drag handles
+    const activityActions = isStageViewerMode ? '' : `
+                <div class="activity-actions">
+                    <button class="action-btn" onclick="openSlidePanel('${sl.id}',${secId === null ? 'null' : `'${secId}'`},'${act.id}')" title="Edit">✎</button>
+                    <button class="action-btn delete" onclick="deleteActivity('${sl.id}',${secId === null ? 'null' : `'${secId}'`},'${act.id}')" title="Delete">✕</button>
+                </div>`;
+
+    const dragHandle = isStageViewerMode ? '' : '<span class="activity-drag-handle">⋮⋮</span>';
+    const draggable = isStageViewerMode ? 'false' : 'true';
+
     return `
-        <div class="activity-row" draggable="true" data-activity-id="${act.id}" data-section-id="${secId}" data-swimlane-id="${sl.id}" style="grid-template-columns: ${ACTIVITY_COL_WIDTH}px 1fr;">
+        <div class="activity-row" draggable="${draggable}" data-activity-id="${act.id}" data-section-id="${secId}" data-swimlane-id="${sl.id}" style="grid-template-columns: ${ACTIVITY_COL_WIDTH}px 1fr;">
             <div class="activity-label">
-                <span class="activity-drag-handle">⋮⋮</span>
+                ${dragHandle}
                 <div class="activity-name" onclick="openSlidePanel('${sl.id}',${secId === null ? 'null' : `'${secId}'`},'${act.id}')">${act.name}</div>
                 <div class="activity-badges">
-                    <div class="badge deliverable ${act.isDeliverable ? '' : 'inactive'}" onclick="toggleDeliverableProp('${sl.id}',${secId === null ? 'null' : `'${secId}'`},'${act.id}')" title="Deliverable">D</div>
-                    <div class="badge gate ${act.isGate ? '' : 'inactive'}" onclick="toggleGateProp('${sl.id}',${secId === null ? 'null' : `'${secId}'`},'${act.id}')" title="Exit Gate">G</div>
+                    <div class="badge deliverable ${act.isDeliverable ? '' : 'inactive'}" ${isStageViewerMode ? '' : `onclick="toggleDeliverableProp('${sl.id}',${secId === null ? 'null' : `'${secId}'`},'${act.id}')"`} title="Deliverable">D</div>
+                    <div class="badge gate ${act.isGate ? '' : 'inactive'}" ${isStageViewerMode ? '' : `onclick="toggleGateProp('${sl.id}',${secId === null ? 'null' : `'${secId}'`},'${act.id}')"`} title="Exit Gate">G</div>
                     <div class="badge friction ${hasFriction(act) ? '' : 'inactive'}" title="Friction Point">⚠</div>
                     <div class="badge notes ${hasStageNotes(act) ? '' : 'inactive'}" title="Stage Notes">${hasStageNotes(act) ? '📝' : '≡'}</div>
                     ${raciBadges}
                 </div>
-                <div class="activity-actions">
-                    <button class="action-btn" onclick="openSlidePanel('${sl.id}',${secId === null ? 'null' : `'${secId}'`},'${act.id}')" title="Edit">✎</button>
-                    <button class="action-btn delete" onclick="deleteActivity('${sl.id}',${secId === null ? 'null' : `'${secId}'`},'${act.id}')" title="Delete">✕</button>
-                </div>
+                ${activityActions}
             </div>
             <div class="activity-chart" data-activity-id="${act.id}">${stageBgs}${barHtml}</div>
         </div>
@@ -1022,11 +1046,12 @@ function showTooltip(e) {
     if (act.deliverableDetails?.trim()) html += `<div class="tooltip-section"><div class="tooltip-section-title">📄 Deliverable</div><div class="tooltip-text">${act.deliverableDetails}</div></div>`;
     if (act.notes?.trim()) html += `<div class="tooltip-section"><div class="tooltip-section-title">📝 Notes</div><div class="tooltip-text">${act.notes}</div></div>`;
 
-    // Show all stage-specific notes
+    // Show all stage-specific notes with stage-specific colors
     if (act.stageNotes && Object.keys(act.stageNotes).length > 0) {
         ganttData.stages.forEach(stage => {
             if (act.stageNotes[stage.id]?.trim()) {
-                html += `<div class="tooltip-section tooltip-stage-note"><div class="tooltip-section-title">🔖 ${stage.name}</div><div class="tooltip-text">${act.stageNotes[stage.id]}</div></div>`;
+                const stageColor = stage.color || '#58a6ff';
+                html += `<div class="tooltip-section tooltip-stage-note" style="border-left-color: ${stageColor};"><div class="tooltip-section-title" style="color: ${stageColor};">Stage ${stage.num}: ${stage.name}</div><div class="tooltip-text">${act.stageNotes[stage.id]}</div></div>`;
             }
         });
     }
@@ -1110,6 +1135,16 @@ function hideTooltip() {
 }
 
 function attachDragListeners() {
+    // Skip drag listeners in stage viewer mode (read-only)
+    if (isStageViewerMode) {
+        // Only attach click listener to open slide panel in read-only mode
+        document.querySelectorAll('.bar').forEach(bar => {
+            bar.addEventListener('dblclick', openBarEditPanel);
+            bar.style.cursor = 'pointer';
+        });
+        return;
+    }
+
     document.querySelectorAll('.bar').forEach(bar => {
         bar.addEventListener('mousedown', startBarDrag);
         bar.addEventListener('dblclick', openBarEditPanel);
@@ -1987,6 +2022,10 @@ function toggleSlideGate() {
 
     // Update RACI/Gate Owner sections
     toggleSlideGateMode();
+
+    // Update checklist section title
+    const isGate = !badge.classList.contains('inactive');
+    updateChecklistSectionTitle(isGate);
 }
 
 function toggleFormSection(titleElement) {
@@ -2140,6 +2179,10 @@ function openSlidePanel(slId, secId, actId) {
     // Populate Stage-Specific Notes section
     populateStageNotesSection(act);
 
+    // Populate checklist section
+    renderChecklistItems(act.checklist || []);
+    updateChecklistSectionTitle(act.isGate);
+
     // Initialize max-height for all form section contents (for collapse animation)
     document.querySelectorAll('.form-section-content').forEach(content => {
         if (!content.classList.contains('collapsed')) {
@@ -2170,7 +2213,52 @@ function openSlidePanel(slId, secId, actId) {
             closeSlidePanel();
         }
     };
-    
+
+    // If in stage viewer mode, make panel read-only
+    if (isStageViewerMode) {
+        // Change title to indicate view-only mode
+        document.getElementById('slide-panel-title').textContent = `View: ${act.name}`;
+
+        // Disable all inputs, selects, and textareas
+        document.querySelectorAll('#slide-panel input, #slide-panel select, #slide-panel textarea').forEach(input => {
+            input.disabled = true;
+            input.style.opacity = '0.7';
+        });
+
+        // Hide all badges' onclick behavior and make them non-clickable
+        document.querySelectorAll('#slide-panel .badge').forEach(badge => {
+            badge.style.cursor = 'default';
+            badge.style.pointerEvents = 'none';
+        });
+
+        // Hide the footer buttons
+        document.querySelector('.slide-panel-footer').style.display = 'none';
+
+        // Hide action buttons in various sections
+        document.querySelectorAll('#slide-panel .btn, #slide-panel button').forEach(btn => {
+            if (!btn.classList.contains('slide-panel-close')) {
+                btn.style.display = 'none';
+            }
+        });
+    } else {
+        // Ensure everything is enabled in edit mode
+        document.querySelectorAll('#slide-panel input, #slide-panel select, #slide-panel textarea').forEach(input => {
+            input.disabled = false;
+            input.style.opacity = '1';
+        });
+
+        document.querySelectorAll('#slide-panel .badge').forEach(badge => {
+            badge.style.cursor = 'pointer';
+            badge.style.pointerEvents = 'auto';
+        });
+
+        document.querySelector('.slide-panel-footer').style.display = 'flex';
+
+        document.querySelectorAll('#slide-panel .btn, #slide-panel button').forEach(btn => {
+            btn.style.display = '';
+        });
+    }
+
     // Open panel and shrink chart
     document.body.classList.add('panel-open');
     document.getElementById('slide-panel').classList.add('open');
@@ -2184,6 +2272,112 @@ function openSlidePanel(slId, secId, actId) {
         editingRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 }
+
+// ===== CHECKLIST FUNCTIONS =====
+
+let slideChecklist = [];
+
+function addChecklistItem() {
+    const container = document.getElementById('slide-checklist-items');
+    const itemId = 'chk-' + Date.now();
+
+    const itemDiv = document.createElement('div');
+    itemDiv.className = 'checklist-item';
+    itemDiv.setAttribute('data-checklist-id', itemId);
+    itemDiv.style.cssText = 'display: flex; gap: 8px; align-items: center;';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = 'Enter checklist item...';
+    input.style.cssText = 'flex: 1; padding: 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--input-bg); color: var(--text);';
+    input.value = '';
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'btn';
+    removeBtn.textContent = '×';
+    removeBtn.style.cssText = 'padding: 6px 12px; min-width: auto;';
+    removeBtn.onclick = () => removeChecklistItem(itemId);
+
+    itemDiv.appendChild(input);
+    itemDiv.appendChild(removeBtn);
+    container.appendChild(itemDiv);
+
+    slideChecklist.push({ id: itemId, text: '' });
+
+    // Focus the new input
+    input.focus();
+}
+
+function removeChecklistItem(itemId) {
+    const itemDiv = document.querySelector(`[data-checklist-id="${itemId}"]`);
+    if (itemDiv) {
+        itemDiv.remove();
+    }
+    slideChecklist = slideChecklist.filter(item => item.id !== itemId);
+}
+
+function renderChecklistItems(checklist) {
+    const container = document.getElementById('slide-checklist-items');
+    container.innerHTML = '';
+
+    if (!checklist || checklist.length === 0) {
+        slideChecklist = [];
+        return;
+    }
+
+    slideChecklist = checklist.map(item => ({ ...item }));
+
+    checklist.forEach(item => {
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'checklist-item';
+        itemDiv.setAttribute('data-checklist-id', item.id);
+        itemDiv.style.cssText = 'display: flex; gap: 8px; align-items: center;';
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.placeholder = 'Enter checklist item...';
+        input.style.cssText = 'flex: 1; padding: 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--input-bg); color: var(--text);';
+        input.value = item.text || '';
+
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'btn';
+        removeBtn.textContent = '×';
+        removeBtn.style.cssText = 'padding: 6px 12px; min-width: auto;';
+        removeBtn.onclick = () => removeChecklistItem(item.id);
+
+        itemDiv.appendChild(input);
+        itemDiv.appendChild(removeBtn);
+        container.appendChild(itemDiv);
+    });
+}
+
+function getChecklistFromUI() {
+    const items = [];
+    document.querySelectorAll('#slide-checklist-items .checklist-item').forEach(itemDiv => {
+        const input = itemDiv.querySelector('input');
+        const id = itemDiv.getAttribute('data-checklist-id');
+        const text = input.value.trim();
+        if (text) {
+            items.push({ id, text });
+        }
+    });
+    return items;
+}
+
+function updateChecklistSectionTitle(isGate) {
+    const titleSpan = document.getElementById('checklist-section-title');
+    const descSpan = document.getElementById('checklist-description');
+
+    if (isGate) {
+        titleSpan.textContent = '✓ Exit Criteria';
+        descSpan.textContent = 'Add criteria that must be met to pass through this gate';
+    } else {
+        titleSpan.textContent = '✓ Checklist';
+        descSpan.textContent = 'Add items that need to be checked during or at the end of this activity';
+    }
+}
+
+// ===== END CHECKLIST FUNCTIONS =====
 
 function closeSlidePanel() {
     document.body.classList.remove('panel-open');
@@ -2382,6 +2576,7 @@ function saveSlidePanel(shouldClose = true) {
         resolution: act.resolution || '',
         deliverableDetails: act.deliverableDetails || '',
         notes: act.notes || '',
+        checklist: [...(act.checklist || [])],
         predecessors: [...(act.predecessors || [])],
         start: act.start,
         end: act.end
@@ -2401,7 +2596,8 @@ function saveSlidePanel(shouldClose = true) {
     const newResolution = document.getElementById('slide-resolution').value || '';
     const newDeliverableDetails = document.getElementById('slide-deliverable-details').value || '';
     const newNotes = document.getElementById('slide-notes').value || '';
-    
+    const newChecklist = getChecklistFromUI();
+
     // Calculate new position for gates
     let newStart = act.start;
     let newEnd = act.end;
@@ -2448,6 +2644,7 @@ function saveSlidePanel(shouldClose = true) {
         originalState.resolution !== newResolution ||
         originalState.deliverableDetails !== newDeliverableDetails ||
         originalState.notes !== newNotes ||
+        JSON.stringify(originalState.checklist) !== JSON.stringify(newChecklist) ||
         JSON.stringify(originalState.predecessors.sort()) !== JSON.stringify(newPredecessors.sort()) ||
         JSON.stringify(oldSuccs.sort()) !== JSON.stringify(newSuccessors.sort()) ||
         originalState.start !== newStart ||
@@ -2463,6 +2660,7 @@ function saveSlidePanel(shouldClose = true) {
     act.resolution = newResolution;
     act.deliverableDetails = newDeliverableDetails;
     act.notes = newNotes;
+    act.checklist = newChecklist;
     act.start = newStart;
     act.end = newEnd;
 
@@ -3424,310 +3622,151 @@ function resetToDefault() {
     }
 }
 
-// Stage Viewer Functions
-let selectedStageForViewer = null;
-let selectedActivityInViewer = null;
+
+// Stage Viewer Mode
+let isStageViewerMode = false;
+let stageViewerFilterStageId = null; // null means "All Stages"
 
 function toggleStageViewer() {
     const viewer = document.getElementById('stage-viewer');
     const mainContainer = document.querySelector('.container');
 
-    const isHidden = viewer.style.display === 'none' || viewer.style.display === '';
+    isStageViewerMode = !isStageViewerMode;
 
-    if (isHidden) {
+    if (isStageViewerMode) {
         // Show stage viewer
-        console.log('Opening stage viewer. Total stages:', ganttData.stages.length, 'Total swimlanes:', ganttData.swimlanes.length);
-
         viewer.style.display = 'flex';
         mainContainer.style.display = 'none';
 
-        // Populate stage selector
+        // Populate stage selector with "All Stages" option
         const selector = document.getElementById('stage-viewer-selector');
-        console.log('Selector element found:', selector !== null);
-        console.log('ganttData.stages:', ganttData.stages);
+        const allStagesOption = '<option value="all">All Stages</option>';
+        const stageOptions = ganttData.stages.map(stage =>
+            `<option value="${stage.id}">${stage.num}. ${stage.name}</option>`
+        ).join('');
+        selector.innerHTML = allStagesOption + stageOptions;
 
-        if (selector && ganttData.stages && ganttData.stages.length > 0) {
-            selector.innerHTML = ganttData.stages.map(stage =>
-                `<option value="${stage.id}">${stage.num}. ${stage.name}</option>`
-            ).join('');
+        // Default to "All Stages"
+        stageViewerFilterStageId = null;
+        selector.value = 'all';
 
-            console.log('Stage options created:', selector.innerHTML);
-
-            // Select first stage and update view
-            selectedStageForViewer = ganttData.stages[0].id;
-            updateStageView();
-        } else {
-            console.error('Error: selector or stages missing', {
-                selectorExists: selector !== null,
-                stagesLength: ganttData.stages ? ganttData.stages.length : 0
-            });
-        }
+        // Render the gantt chart in the stage viewer
+        renderStageViewerGantt();
     } else {
         // Hide stage viewer
         viewer.style.display = 'none';
         mainContainer.style.display = 'block';
-        selectedActivityInViewer = null;
+        stageViewerFilterStageId = null;
     }
 }
 
 function updateStageView() {
     const selector = document.getElementById('stage-viewer-selector');
-    selectedStageForViewer = selector.value;
-    selectedActivityInViewer = null; // Clear selection when changing stages
+    const selectedValue = selector.value;
 
-    const stage = ganttData.stages.find(s => s.id === selectedStageForViewer);
-    if (!stage) return;
+    if (selectedValue === 'all') {
+        stageViewerFilterStageId = null; // Show all stages
+    } else {
+        stageViewerFilterStageId = selectedValue;
+    }
 
-    const stageIndex = ganttData.stages.findIndex(s => s.id === selectedStageForViewer);
-    const stageWidth = 100 / ganttData.stages.length;
-    const stageStart = stageIndex * stageWidth;
-    const stageEnd = (stageIndex + 1) * stageWidth;
+    // Re-render the gantt chart with the new filter
+    renderStageViewerGantt();
+}
 
-    console.log('Stage View Debug:', {
-        stageId: selectedStageForViewer,
-        stageIndex,
-        stageWidth,
-        stageStart,
-        stageEnd,
-        totalStages: ganttData.stages.length
-    });
+function renderStageViewerGantt() {
+    // Temporarily swap the render targets
+    const originalGanttInner = document.getElementById('gantt-inner');
+    const viewerGanttInner = document.getElementById('stage-viewer-gantt-inner');
 
-    // Find all activities that overlap with this stage
-    const activities = [];
-    ganttData.swimlanes.forEach(sl => {
-        // Swimlane-level activities
-        if (sl.activities) {
-            sl.activities.forEach(act => {
-                if (act.start < stageEnd && act.end > stageStart) {
-                    activities.push({
-                        ...act,
-                        swimlaneName: sl.name,
-                        sectionName: null,
-                        swimlaneId: sl.id,
-                        sectionId: null
+    // Store original data
+    const originalData = JSON.parse(JSON.stringify(ganttData));
+
+    // If filtering by a specific stage, modify the data to show only that stage
+    if (stageViewerFilterStageId !== null) {
+        // Find the stage
+        const stage = ganttData.stages.find(s => s.id === stageViewerFilterStageId);
+        if (stage) {
+            // Filter to show only the selected stage
+            ganttData.stages = [stage];
+
+            // Calculate stage boundaries in the ORIGINAL data (before filtering stages)
+            const allStages = originalData.stages;
+            const stageIndex = allStages.findIndex(s => s.id === stageViewerFilterStageId);
+            const stageWidth = 100 / allStages.length;
+            const stageStart = stageIndex * stageWidth;
+            const stageEnd = (stageIndex + 1) * stageWidth;
+
+            // Filter activities in swimlanes and sections to only show those overlapping with this stage
+            ganttData.swimlanes.forEach(sl => {
+                // Filter swimlane-level activities
+                if (sl.activities) {
+                    sl.activities = sl.activities.filter(act => {
+                        // Activity overlaps with stage if its range intersects with stage range
+                        return act.end > stageStart && act.start < stageEnd;
+                    }).map(act => {
+                        // Adjust activity positions to fit within the single stage (0-100%)
+                        const newAct = { ...act };
+                        newAct.start = Math.max(0, ((act.start - stageStart) / stageWidth) * 100);
+                        newAct.end = Math.min(100, ((act.end - stageStart) / stageWidth) * 100);
+                        return newAct;
                     });
                 }
+                // Filter section activities
+                if (sl.sections) {
+                    sl.sections.forEach(sec => {
+                        if (sec.activities) {
+                            sec.activities = sec.activities.filter(act => {
+                                return act.end > stageStart && act.start < stageEnd;
+                            }).map(act => {
+                                // Adjust activity positions to fit within the single stage (0-100%)
+                                const newAct = { ...act };
+                                newAct.start = Math.max(0, ((act.start - stageStart) / stageWidth) * 100);
+                                newAct.end = Math.min(100, ((act.end - stageStart) / stageWidth) * 100);
+                                return newAct;
+                            });
+                        }
+                    });
+                    // Remove sections with no activities
+                    sl.sections = sl.sections.filter(sec => sec.activities && sec.activities.length > 0);
+                }
             });
-        }
 
-        // Section activities
-        if (sl.sections) {
-            sl.sections.forEach(sec => {
-                sec.activities.forEach(act => {
-                    if (act.start < stageEnd && act.end > stageStart) {
-                        activities.push({
-                            ...act,
-                            swimlaneName: sl.name,
-                            sectionName: sec.name,
-                            swimlaneId: sl.id,
-                            sectionId: sec.id
-                        });
-                    }
-                });
+            // Remove swimlanes that have no activities and no sections with activities
+            ganttData.swimlanes = ganttData.swimlanes.filter(sl => {
+                const hasActivities = sl.activities && sl.activities.length > 0;
+                const hasSections = sl.sections && sl.sections.length > 0;
+                return hasActivities || hasSections;
             });
-        }
-    });
-
-    console.log('Stage viewer: Found', activities.length, 'activities for stage', stage.name, '(' + stageStart.toFixed(2) + '% - ' + stageEnd.toFixed(2) + '%)');
-
-    // Render activities
-    renderStageActivities(activities, stage, stageStart, stageEnd, stageWidth);
-
-    // Clear details panel
-    document.getElementById('stage-viewer-details').innerHTML = `
-        <div class="empty-state">
-            <p>Please select an activity</p>
-        </div>
-    `;
-}
-
-function renderStageActivities(activities, stage, stageStart, stageEnd, stageWidth) {
-    const container = document.getElementById('stage-viewer-activities');
-
-    if (activities.length === 0) {
-        container.innerHTML = '<div class="empty-state"><p>No activities in this stage</p></div>';
-        return;
-    }
-
-    container.innerHTML = activities.map(act => {
-        const extendsLeft = act.start < stageStart;
-        const extendsRight = act.end > stageEnd;
-
-        // Calculate visible portion within stage
-        const visibleStart = Math.max(act.start, stageStart);
-        const visibleEnd = Math.min(act.end, stageEnd);
-        const visibleLeft = ((visibleStart - stageStart) / stageWidth) * 100;
-        const visibleWidth = ((visibleEnd - visibleStart) / stageWidth) * 100;
-
-        // Get activity type info
-        const activityType = act.activityType ? ganttData.activityTypes.find(t => t.id === act.activityType) : null;
-        const typeColor = activityType ? activityType.color : '#58a6ff';
-
-        // Get actor info
-        const accountableActor = act.accountable ? ganttData.actors.find(a => a.id === act.accountable) : null;
-
-        // Build flags
-        const flags = [];
-        if (act.isGate) flags.push('G');
-        if (act.isDeliverable) flags.push('D');
-        if (hasFriction(act)) flags.push('⚠');
-        if (hasStageNotes(act)) flags.push('📝');
-
-        // Build meta info
-        const metaItems = [];
-        if (act.sectionName) metaItems.push(`📂 ${act.sectionName}`);
-        else metaItems.push(`📂 ${act.swimlaneName}`);
-        if (activityType) metaItems.push(`🏷 ${activityType.name}`);
-        if (accountableActor) metaItems.push(`👤 ${accountableActor.name}`);
-
-        return `
-            <div class="stage-activity-card" data-activity-id="${act.id}" data-swimlane-id="${act.swimlaneId}" data-section-id="${act.sectionId || ''}" onclick="selectActivityInViewer('${act.id}', '${act.swimlaneId}', '${act.sectionId || ''}')">
-                <div class="stage-activity-header">
-                    <div class="stage-activity-title">${act.name}</div>
-                    <div class="stage-activity-badges">
-                        ${flags.map(f => `<span class="activity-badge">${f}</span>`).join('')}
-                    </div>
-                </div>
-
-                <div class="stage-activity-bar">
-                    ${extendsLeft ? '<span class="stage-activity-bar-extend-left">←</span>' : ''}
-                    <div class="stage-activity-bar-fill" style="left: ${visibleLeft}%; width: ${visibleWidth}%; background: ${typeColor};">
-                        ${act.isDeliverable ? '<span style="margin-right: 4px;">D</span>' : ''}
-                        ${act.predecessor ? '<span style="margin-right: 4px;">⛓</span>' : ''}
-                        ${hasFriction(act) ? '<span style="margin-right: 4px;">⚠</span>' : ''}
-                        ${hasStageNotes(act) ? '<span style="margin-right: 4px;">📝</span>' : ''}
-                    </div>
-                    ${extendsRight ? '<span class="stage-activity-bar-extend-right">→</span>' : ''}
-                </div>
-
-                <div class="stage-activity-meta">
-                    ${metaItems.map(item => `<span class="stage-activity-meta-item">${item}</span>`).join('')}
-                </div>
-            </div>
-        `;
-    }).join('');
-}
-
-function selectActivityInViewer(actId, slId, secId) {
-    selectedActivityInViewer = { actId, slId, secId };
-
-    // Update card selection styles
-    document.querySelectorAll('.stage-activity-card').forEach(card => {
-        card.classList.remove('selected');
-    });
-    document.querySelector(`.stage-activity-card[data-activity-id="${actId}"]`).classList.add('selected');
-
-    // Get activity data
-    const activity = getActivity(slId, secId, actId);
-    if (!activity) return;
-
-    // Render activity details
-    renderActivityDetails(activity);
-}
-
-function renderActivityDetails(act) {
-    const detailsContainer = document.getElementById('stage-viewer-details');
-
-    // Get related data
-    const activityType = act.activityType ? ganttData.activityTypes.find(t => t.id === act.activityType) : null;
-    const accountableActor = act.accountable ? ganttData.actors.find(a => a.id === act.accountable) : null;
-    const responsibleActors = (act.responsible || []).map(id => ganttData.actors.find(a => a.id === id)).filter(Boolean);
-    const consultedActors = (act.consulted || []).map(id => ganttData.actors.find(a => a.id === id)).filter(Boolean);
-    const informedActors = (act.informed || []).map(id => ganttData.actors.find(a => a.id === id)).filter(Boolean);
-    const gateOwner = act.gateOwner ? ganttData.actors.find(a => a.id === act.gateOwner) : null;
-
-    // Get predecessor/successor info
-    const predecessor = act.predecessor ? findActivityById(act.predecessor) : null;
-    const successors = getSuccessors(act.id);
-
-    // Build stage notes section
-    let stageNotesHtml = '';
-    if (act.stageNotes && Object.keys(act.stageNotes).length > 0) {
-        const stageIndex = ganttData.stages.findIndex(s => s.id === selectedStageForViewer);
-        const currentStageNote = act.stageNotes[stageIndex];
-
-        if (currentStageNote && currentStageNote.trim()) {
-            stageNotesHtml = `
-                <div class="stage-detail-section">
-                    <div class="stage-detail-section-title">Stage-Specific Notes</div>
-                    <div class="stage-detail-section-content">${currentStageNote}</div>
-                </div>
-            `;
         }
     }
 
-    detailsContainer.innerHTML = `
-        <div class="stage-viewer-details-content">
-            <div class="stage-detail-title">${act.name}</div>
+    // Swap IDs temporarily for all three containers that render() uses
+    const originalStageHeaders = document.getElementById('stage-headers');
+    const viewerStageHeaders = document.getElementById('stage-viewer-stage-headers');
+    const originalGanttContent = document.getElementById('gantt-content');
+    const viewerGanttContent = document.getElementById('stage-viewer-gantt-content');
 
-            ${act.isGate ? `
-                <div class="stage-detail-section">
-                    <div class="stage-detail-section-title">Exit Gate</div>
-                    <div class="stage-detail-section-content">
-                        ${gateOwner ? `Gate Owner: ${gateOwner.name}` : 'No gate owner assigned'}
-                    </div>
-                </div>
-            ` : ''}
+    originalGanttInner.id = 'gantt-inner-temp';
+    viewerGanttInner.id = 'gantt-inner';
+    originalStageHeaders.id = 'stage-headers-temp';
+    viewerStageHeaders.id = 'stage-headers';
+    originalGanttContent.id = 'gantt-content-temp';
+    viewerGanttContent.id = 'gantt-content';
 
-            ${activityType ? `
-                <div class="stage-detail-section">
-                    <div class="stage-detail-section-title">Activity Type</div>
-                    <div class="stage-detail-section-content">
-                        <span style="display: inline-block; width: 12px; height: 12px; border-radius: 2px; background: ${activityType.color}; margin-right: 6px;"></span>
-                        ${activityType.name}
-                    </div>
-                </div>
-            ` : ''}
+    // Call existing render
+    render();
 
-            ${!act.isGate && (accountableActor || responsibleActors.length || consultedActors.length || informedActors.length) ? `
-                <div class="stage-detail-section">
-                    <div class="stage-detail-section-title">RACI Assignments</div>
-                    <div class="stage-detail-section-content">
-                        ${accountableActor ? `<div><strong>Accountable:</strong> ${accountableActor.name}</div>` : ''}
-                        ${responsibleActors.length ? `<div><strong>Responsible:</strong> ${responsibleActors.map(a => a.name).join(', ')}</div>` : ''}
-                        ${consultedActors.length ? `<div><strong>Consulted:</strong> ${consultedActors.map(a => a.name).join(', ')}</div>` : ''}
-                        ${informedActors.length ? `<div><strong>Informed:</strong> ${informedActors.map(a => a.name).join(', ')}</div>` : ''}
-                    </div>
-                </div>
-            ` : ''}
+    // Swap back all IDs
+    viewerGanttInner.id = 'stage-viewer-gantt-inner';
+    originalGanttInner.id = 'gantt-inner';
+    viewerStageHeaders.id = 'stage-viewer-stage-headers';
+    originalStageHeaders.id = 'stage-headers';
+    viewerGanttContent.id = 'stage-viewer-gantt-content';
+    originalGanttContent.id = 'gantt-content';
 
-            ${act.isDeliverable && act.deliverableDetails ? `
-                <div class="stage-detail-section">
-                    <div class="stage-detail-section-title">Deliverable Details</div>
-                    <div class="stage-detail-section-content">${act.deliverableDetails}</div>
-                </div>
-            ` : ''}
-
-            ${hasFriction(act) ? `
-                <div class="stage-detail-section">
-                    <div class="stage-detail-section-title">Friction Point</div>
-                    <div class="stage-detail-section-content">
-                        <div><strong>Issue:</strong> ${act.friction}</div>
-                        ${act.resolution ? `<div style="margin-top: 8px;"><strong>Resolution:</strong> ${act.resolution}</div>` : ''}
-                    </div>
-                </div>
-            ` : ''}
-
-            ${predecessor || successors.length ? `
-                <div class="stage-detail-section">
-                    <div class="stage-detail-section-title">Dependencies</div>
-                    <div class="stage-detail-section-content">
-                        ${predecessor ? `<div><strong>Predecessor:</strong> ${predecessor.name}</div>` : ''}
-                        ${successors.length ? `<div><strong>Successors:</strong> ${successors.map(s => s.name).join(', ')}</div>` : ''}
-                    </div>
-                </div>
-            ` : ''}
-
-            ${stageNotesHtml}
-
-            ${act.notes ? `
-                <div class="stage-detail-section">
-                    <div class="stage-detail-section-title">General Notes</div>
-                    <div class="stage-detail-section-content">${act.notes}</div>
-                </div>
-            ` : ''}
-        </div>
-    `;
+    // Restore original data
+    ganttData = originalData;
 }
 
 // Initialize beforeunload warning

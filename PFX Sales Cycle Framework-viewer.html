@@ -1,0 +1,2467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales Cycle Stage Viewer</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        /* Viewer-specific styles */
+        .viewer-header {
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            padding: 8px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .viewer-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .viewer-title h1 {
+            margin: 0;
+            font-size: 14px;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .viewer-title .project-name {
+            font-size: 14px;
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .stage-tabs {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .stage-tab {
+            padding: 10px 20px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--bg-secondary);
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+            font-size: 14px;
+            opacity: 0.6;
+        }
+
+        .stage-tab:hover {
+            background: var(--bg-card);
+            border-color: var(--text-muted);
+            opacity: 0.8;
+        }
+
+        .stage-tab.active {
+            background: var(--bg-card);
+            color: var(--text-primary);
+            border: 2px solid currentColor;
+            font-weight: 700;
+            opacity: 1;
+        }
+
+        .kanban-board {
+            display: flex;
+            gap: 20px;
+            padding: 24px;
+            overflow-x: auto;
+            height: calc(100vh - 90px);
+        }
+
+        .kanban-column {
+            flex: 1 1 0;
+            min-width: 280px;
+            max-width: none;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .column-resize-handle {
+            position: absolute;
+            top: 0;
+            right: -6px;
+            width: 12px;
+            height: 100%;
+            cursor: col-resize;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .column-resize-handle::after {
+            content: '';
+            width: 2px;
+            height: 40px;
+            background: var(--border);
+            border-radius: 2px;
+            transition: background 0.2s;
+        }
+
+        .column-resize-handle:hover::after {
+            background: var(--text-muted);
+        }
+
+        .kanban-column-header {
+            padding: 20px 16px;
+            border-bottom: 3px solid;
+            background: var(--bg-primary);
+            border-radius: 8px 8px 0 0;
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+
+        .kanban-column-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin: 0 0 8px 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .kanban-column-count {
+            font-size: 13px;
+            font-weight: 500;
+            opacity: 0.8;
+        }
+
+        .kanban-cards {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .activity-card {
+            background: var(--bg-card);
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .activity-card:hover {
+            border-color: var(--text-muted);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .card-header-left {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .card-type-indicator {
+            width: 4px;
+            min-height: 100%;
+            border-radius: 2px;
+            align-self: stretch;
+        }
+
+        .card-title-section {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .card-title {
+            font-size: 15px;
+            font-weight: 600;
+            margin: 0 0 6px 0;
+            line-height: 1.3;
+        }
+
+        .card-badges {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .card-badge {
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .card-badge.type {
+            background: transparent;
+            border: 1px solid;
+        }
+
+        .card-badge.deliverable {
+            background: rgba(121, 192, 255, 0.2);
+            color: #79c0ff;
+        }
+
+        .card-badge.gate {
+            background: rgba(248, 81, 73, 0.2);
+            color: #f85149;
+        }
+
+        /* RACI Matrix */
+        .raci-matrix {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 4px;
+            flex-shrink: 0;
+            min-width: 80px;
+        }
+
+        .raci-matrix-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 4px;
+            background: var(--bg-secondary);
+            border-radius: 4px;
+        }
+
+        .raci-actor-box {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 700;
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .raci-role-label {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+        }
+
+        /* Info rows */
+        .card-info-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            background: var(--bg-secondary);
+            border-radius: 6px;
+            font-size: 13px;
+        }
+
+        .info-icon {
+            font-size: 16px;
+        }
+
+        .info-label {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .info-value {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        /* Stage notes */
+        .card-stage-notes {
+            background: var(--bg-secondary);
+            padding: 10px 12px;
+            border-radius: 6px;
+            border-left: 4px solid white;
+        }
+
+        html.light .card-stage-notes {
+            border-left-color: black;
+        }
+
+        .stage-notes-header {
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 6px;
+            letter-spacing: 0.3px;
+        }
+
+        /* General notes */
+        .card-general-notes {
+            background: var(--bg-secondary);
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-style: italic;
+        }
+
+        .card-notes-text {
+            font-size: 13px;
+            color: white;
+            line-height: 1.5;
+            margin: 0;
+        }
+
+        html.light .card-notes-text {
+            color: black;
+        }
+
+        /* Deliverable section */
+        .card-section {
+            padding: 10px 12px;
+            background: var(--bg-secondary);
+            border-radius: 6px;
+            border-left: 3px solid #79c0ff;
+        }
+
+        .card-section-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: #79c0ff;
+            margin-bottom: 6px;
+            letter-spacing: 0.3px;
+        }
+
+        /* Friction section */
+        .card-section.friction {
+            border-left-color: #f85149;
+        }
+
+        .card-section.friction .card-section-title {
+            color: #f85149;
+        }
+
+        /* Gate owner section */
+        .card-section.gate-owner {
+            border-left-color: #f85149;
+        }
+
+        .card-section.gate-owner .card-section-title {
+            color: #f85149;
+        }
+
+        /* Swimlane indicator */
+        .card-swimlane-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: var(--bg-secondary);
+            border-radius: 6px;
+            border-left: 3px solid;
+            font-size: 13px;
+        }
+
+        .swimlane-label {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .swimlane-name {
+            font-weight: 600;
+        }
+
+        /* Gates column styling */
+        .gates-column {
+            border: 2px solid rgba(248, 81, 73, 0.3);
+        }
+
+        .empty-column {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 200px;
+            color: var(--text-muted);
+            font-style: italic;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .file-input-container {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .font-size-selector {
+            padding: 6px 12px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .font-size-selector:hover {
+            background: var(--bg-card);
+            border-color: var(--text-muted);
+        }
+
+        /* Font size scaling */
+        body.font-size-small {
+            --font-scale: 0.85;
+        }
+
+        body.font-size-medium {
+            --font-scale: 1;
+        }
+
+        body.font-size-large {
+            --font-scale: 1.15;
+        }
+
+        body {
+            --font-scale: 1;
+        }
+
+        .card-title {
+            font-size: calc(15px * var(--font-scale));
+        }
+
+        .card-badge {
+            font-size: calc(11px * var(--font-scale));
+        }
+
+        .card-notes-text {
+            font-size: calc(13px * var(--font-scale));
+        }
+
+        .card-info-row {
+            font-size: calc(13px * var(--font-scale));
+        }
+
+        .info-icon {
+            font-size: calc(16px * var(--font-scale));
+        }
+
+        .stage-notes-header {
+            font-size: calc(12px * var(--font-scale));
+        }
+
+        .card-section-title {
+            font-size: calc(12px * var(--font-scale));
+        }
+
+        .raci-actor-box {
+            font-size: calc(10px * var(--font-scale));
+        }
+
+        .raci-role-label {
+            font-size: calc(10px * var(--font-scale));
+        }
+
+        .kanban-column-title {
+            font-size: calc(18px * var(--font-scale));
+        }
+
+        .kanban-column-count {
+            font-size: calc(13px * var(--font-scale));
+        }
+
+        .stage-tab {
+            font-size: calc(14px * var(--font-scale));
+        }
+
+        .card-swimlane-indicator {
+            font-size: calc(13px * var(--font-scale));
+        }
+
+        .no-data-message {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: calc(100vh - 90px);
+            gap: 20px;
+            color: var(--text-muted);
+        }
+
+        .no-data-message h2 {
+            margin: 0;
+            font-size: 24px;
+        }
+
+        .no-data-message p {
+            margin: 0;
+            font-size: 16px;
+        }
+
+        /* Legend styles */
+        .legend {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .legend-header {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-right: -8px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .legend-separator {
+            width: 2px;
+            height: 20px;
+            background: var(--border);
+            margin: 0 8px;
+        }
+
+        .legend-bar {
+            width: 20px;
+            height: 8px;
+            border-radius: 2px;
+        }
+
+        /* Hide scrollbars while keeping scroll functionality */
+        .kanban-board::-webkit-scrollbar,
+        .kanban-cards::-webkit-scrollbar {
+            display: none;
+        }
+
+        .kanban-board,
+        .kanban-cards {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+    </style>
+</head>
+<body>
+    <div class="viewer-header">
+        <div class="viewer-title">
+            <h1>Sales Cycle Stage Viewer</h1>
+            <div class="project-name" id="project-name">No file loaded</div>
+        </div>
+        <div class="file-input-container">
+            <button class="btn primary" onclick="document.getElementById('json-file-input').click()">Open JSON File</button>
+            <input type="file" id="json-file-input" accept=".json" style="display: none;" onchange="loadJSONFile(event)">
+            <select id="font-size-selector" class="font-size-selector" onchange="changeFontSize(this.value)">
+                <option value="small">Small</option>
+                <option value="medium" selected>Medium</option>
+                <option value="large">Large</option>
+            </select>
+            <button class="theme-toggle" onclick="toggleTheme()">
+                <span id="theme-icon">🌙</span>
+                <span id="theme-label">Dark</span>
+            </button>
+        </div>
+    </div>
+
+    <div id="legend-container" style="padding: 12px 24px; border-bottom: 1px solid var(--border); display: none;">
+        <div id="legend" class="legend"></div>
+    </div>
+
+    <div id="stage-tabs-container" style="padding: 20px 32px 0; display: none;">
+        <div class="stage-tabs" id="stage-tabs"></div>
+    </div>
+
+    <div id="kanban-board" class="kanban-board" style="display: none;"></div>
+
+    <div id="no-data" class="no-data-message">
+        <h2>Welcome to the Sales Cycle Stage Viewer</h2>
+        <p>Click "Open JSON File" to load a sales cycle and view it stage-by-stage</p>
+    </div>
+
+    <script>
+
+    // Embedded JSON data
+    const EMBEDDED_DATA = {
+  "stages": [
+    {
+      "id": "s1",
+      "num": "0",
+      "name": "Pre-Qualification",
+      "color": "#f85149"
+    },
+    {
+      "id": "s2",
+      "num": "1",
+      "name": "Qualify",
+      "color": "#f0883e"
+    },
+    {
+      "id": "s3",
+      "num": "2",
+      "name": "Value Scenario",
+      "color": "#ffd33d"
+    },
+    {
+      "id": "s4",
+      "num": "3",
+      "name": "Value Proposal",
+      "color": "#79c0ff"
+    },
+    {
+      "id": "s_1766511390686",
+      "num": "4",
+      "name": "Closing",
+      "color": "#368EF2"
+    },
+    {
+      "id": "s_1766511408645",
+      "num": "5",
+      "name": "Closed",
+      "color": "#56d364"
+    }
+  ],
+  "actors": [
+    {
+      "id": "actor1",
+      "name": "Account Executive",
+      "color": "#06934A"
+    },
+    {
+      "id": "actor2",
+      "name": "Solution Strategist",
+      "color": "#FAAB00"
+    },
+    {
+      "id": "actor_1766511499381",
+      "name": "Prospect",
+      "color": "#DA37FB"
+    }
+  ],
+  "swimlanes": [
+    {
+      "id": "sl_1766511565910",
+      "name": "Deal Orchestration",
+      "color": "#00F0B4",
+      "collapsed": false,
+      "sections": [],
+      "activities": [
+        {
+          "id": "act_temp_1766513921669",
+          "name": "Introduction Pre-Discovery",
+          "start": 2,
+          "end": 15,
+          "isGate": false,
+          "isDeliverable": true,
+          "accountable": "actor1",
+          "responsible": [],
+          "consulted": [],
+          "informed": [],
+          "predecessor": null,
+          "predecessors": [],
+          "friction": "Inconsistent qualification across opportunities with many being procurement-led.",
+          "resolution": "",
+          "deliverableDetails": "- Initial understanding of pain points, current state\n- Trigger event that lead to introductory call\n- Company briefing to share with internal team",
+          "notes": "",
+          "startStage": 0.12,
+          "endStage": 0.8999999999999999,
+          "_stageBasedPos": true,
+          "activityType": "type_1766520065758",
+          "stageNotes": {
+            "s1": "Opportunity has not been qualified, we can have introductory calls, shared recorded demos, and nurture the opportunity to build a case to qualify it."
+          }
+        },
+        {
+          "id": "act_temp_1766512539274",
+          "name": "Agree to Discovery",
+          "start": 16.666666666666664,
+          "end": 16.666666666666664,
+          "isGate": true,
+          "isDeliverable": false,
+          "predecessor": "act_temp_1766513921669",
+          "predecessors": [
+            "act_temp_1766513921669"
+          ],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "The prospect is agreeing to meeting with Solution Strategist to explain current state",
+          "startStage": 0.9999999999999998,
+          "endStage": 0.9999999999999998,
+          "_stageBasedPos": true,
+          "gateOwner": "actor_1766511499381",
+          "activityType": null
+        },
+        {
+          "id": "act_temp_1766530407359",
+          "name": "Mediafly DSR Created",
+          "start": 16.666666666666664,
+          "end": 16.666666666666664,
+          "isGate": true,
+          "isDeliverable": false,
+          "predecessor": null,
+          "predecessors": [],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "Use standard assets, build action plan and share it with prospect.",
+          "activityType": "type_1766520112399",
+          "startStage": 0.9999999999999998,
+          "endStage": 0.9999999999999998,
+          "stageNotes": {},
+          "gateOwner": "actor1"
+        },
+        {
+          "id": "act_temp_1766526616432",
+          "name": "Player MAP Management",
+          "start": 18,
+          "end": 81,
+          "isGate": false,
+          "isDeliverable": false,
+          "accountable": "actor1",
+          "responsible": [],
+          "consulted": [
+            "actor_1766511499381"
+          ],
+          "informed": [],
+          "predecessor": null,
+          "predecessors": [],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "Multiple stakeholders that will need to provide sign-off for the deal (ELT process)",
+          "activityType": "type_1766520065758",
+          "startStage": 1.08,
+          "endStage": 4.86,
+          "stageNotes": {
+            "s2": "Do we have a player MAP defined with the multiple Power stakeholders that will need to provide “sign-off” for deal? (think ELT process)",
+            "s3": "Do we have access to decision makers through our Champion? Who are the x-functional decision makers and what is their POV on the project? This is both pros and cons.",
+            "s4": "Are we connected to power? T2T, x-functional, are they part of reference calls?",
+            "s_1766511390686": "Are Exec Sponsors and Coach actively engaging in negotiating. Important to provide “sanity check” on procurement/legal discussions."
+          }
+        },
+        {
+          "id": "act_temp_1766728653312",
+          "name": "Competitive Landscape",
+          "start": 18,
+          "end": 81,
+          "isGate": false,
+          "isDeliverable": false,
+          "accountable": "actor1",
+          "responsible": [],
+          "consulted": [
+            "actor_1766511499381"
+          ],
+          "informed": [],
+          "predecessor": null,
+          "predecessors": [],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "",
+          "activityType": "type_1766520065758",
+          "startStage": 1.08,
+          "endStage": 4.86,
+          "stageNotes": {
+            "s2": "Do we understand the competition in the deal? Are there current processes and tools in place?",
+            "s3": "Express the footholds we have and value we can drive, with a TTV focus (i.e. Agents)\nWhat are our blindspots & weknesses, how are we covering them?",
+            "s4": "If still competitive, why are we on Stage 3? What \"selling\" steps are left to win their bid? How are we using our coach and access to power to beat the competition?",
+            "s_1766511390686": "If still competitive - What evidence do we have that we are not negotiating to the lowest bidder? Should we be in S3?"
+          }
+        },
+        {
+          "id": "act_temp_1766530681277",
+          "name": "Ecosystem / SI Discussion",
+          "start": 18,
+          "end": 81,
+          "isGate": false,
+          "isDeliverable": false,
+          "accountable": "actor1",
+          "responsible": [],
+          "consulted": [],
+          "informed": [],
+          "predecessor": null,
+          "predecessors": [],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "",
+          "activityType": "type_1766520065758",
+          "startStage": 1.08,
+          "endStage": 4.86,
+          "stageNotes": {
+            "s2": "What SIs are we recommending for the project? Understand fi it's a prospect requirement to go through a \"SI bid\" process.",
+            "s3": "Introduce recommendeed SI (have a back up plan)",
+            "s4": "SI has been introduced, we have clear understanding of SI process and if SaaS can go ahead of SOW",
+            "s_1766511390686": "SOW is in process with selected SI. AEs are working with SI to ensure their closing process is running alognside of SaaS (VERY IMPORTANT, unless communicated by prospect that SaaS can go ahead of SOW)"
+          }
+        },
+        {
+          "id": "act_temp_1766902363709",
+          "name": "Budget Path",
+          "start": 18,
+          "end": 81,
+          "isGate": false,
+          "isDeliverable": false,
+          "accountable": "actor1",
+          "responsible": [],
+          "consulted": [],
+          "informed": [],
+          "predecessor": null,
+          "predecessors": [],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "",
+          "stageNotes": {
+            "s2": "Have we communicated the minimal cost of Agents as compared to Value? If POM, understanding of the price-tag associated. Does the prospect understand the path to budget at a high level?",
+            "s3": "What is the path to budget and WHO holds the money? DO we have a \"knockout punch\" offer that will move the deal?",
+            "s4": "Clearly if the money as been allocated for project or what is the path and approval process to budget? Who has approvals on money? if it is with an IT o CFO spend, is there other sign-off required before getting budget?\n\nEnsure that ALL proposals include \"give/gets\", \"time fencing\" and high-level understanding of next steps.",
+            "s_1766511390686": "Path to money is clear with timing. If the path to money is >60 days, should we be in S4?"
+          },
+          "activityType": "type_1766520090486",
+          "startStage": 1.08,
+          "endStage": 4.86
+        },
+        {
+          "id": "act_temp_1766723747925",
+          "name": "References / Case Studies",
+          "start": 18,
+          "end": 81,
+          "isGate": false,
+          "isDeliverable": false,
+          "accountable": "actor1",
+          "responsible": [],
+          "consulted": [
+            "actor2"
+          ],
+          "informed": [],
+          "predecessor": null,
+          "predecessors": [],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "",
+          "startStage": 1.08,
+          "endStage": 4.86,
+          "activityType": "type_1766520112399",
+          "stageNotes": {
+            "s2": "Have we introduced \"like\" customers, pains solved and VALUE received from their partnership with PFX?",
+            "s3": "Have we expressed the value the prospect will receive? Introductions into \"like\" customers for references. Do we feel \"connected\" as evidenced by access to decision maker, onsites and validated by third parties (i.e. GTM partners like SAP)",
+            "s4": "Is prospect connected with customers, partners, executives to find out more about PFX?",
+            "s_1766511390686": "How involved is Prospect? Are multiple stakeholders getting engaged with selected SI, discussing the project? Do we have other indicators of involvement? Are AEs creating moments of connection?"
+          }
+        },
+        {
+          "id": "act_temp_1766525964976",
+          "name": "Pain point clearly identified",
+          "start": 33.33333333333333,
+          "end": 33.33333333333333,
+          "isGate": true,
+          "isDeliverable": false,
+          "predecessor": null,
+          "predecessors": [],
+          "friction": "Pain point documentation is inconsistent.",
+          "resolution": "Update SFDC opportunity page with required input.",
+          "deliverableDetails": "",
+          "notes": "",
+          "activityType": "type_1766520065758",
+          "startStage": 1.9999999999999996,
+          "endStage": 1.9999999999999996,
+          "gateOwner": "actor1"
+        },
+        {
+          "id": "act_temp_1766526452502",
+          "name": "Champion & Exec Level Sponsor Identified",
+          "start": 33.33333333333333,
+          "end": 33.33333333333333,
+          "isGate": true,
+          "isDeliverable": false,
+          "predecessor": null,
+          "predecessors": [],
+          "friction": "Inconsistent documentation in SFDC.",
+          "resolution": "Update SFDC to capture this information as part of exit criteria.",
+          "deliverableDetails": "",
+          "notes": "",
+          "activityType": "type_1766520065758",
+          "startStage": 1.9999999999999996,
+          "endStage": 1.9999999999999996,
+          "gateOwner": "actor1"
+        },
+        {
+          "id": "act_temp_1766512667153",
+          "name": "Path to funding available",
+          "start": 50,
+          "end": 50,
+          "isGate": true,
+          "isDeliverable": false,
+          "predecessor": null,
+          "predecessors": [],
+          "friction": "Inconsistent documentation in SFDC.",
+          "resolution": "Update input in SFDC as part of exit criteria.",
+          "deliverableDetails": "",
+          "notes": "Prospect has shared information on how budget / funding will be secured.",
+          "startStage": 3,
+          "endStage": 3,
+          "_stageBasedPos": true,
+          "gateOwner": "actor_1766511499381",
+          "activityType": null
+        },
+        {
+          "id": "act_temp_1766530611463",
+          "name": "Top2Top Meeting",
+          "start": 52,
+          "end": 81,
+          "isGate": false,
+          "isDeliverable": false,
+          "accountable": "actor1",
+          "responsible": [
+            "actor1",
+            "actor_1766511499381"
+          ],
+          "consulted": [],
+          "informed": [],
+          "predecessor": null,
+          "predecessors": [],
+          "friction": "Inconsistent visibility of the planning and relationships that need to be included in this step.",
+          "resolution": "Make use of tools like 100handshakes.",
+          "deliverableDetails": "",
+          "notes": "",
+          "activityType": "type_1766520065758",
+          "startStage": 3.12,
+          "endStage": 4.86,
+          "stageNotes": {
+            "s4": "AE starts to identify who needs to be included in this conversations. Also socialize the idea with the prospect to plan for it.",
+            "s_1766511390686": "Top2Top meetings are occurring and we have good visibility into path to close as well as potential obstacles."
+          }
+        },
+        {
+          "id": "act_temp_1766596976014",
+          "name": "Pricefx is Selected",
+          "start": 66.66666666666666,
+          "end": 66.66666666666666,
+          "isGate": true,
+          "isDeliverable": false,
+          "predecessor": null,
+          "predecessors": [],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "",
+          "activityType": "type_1766520065758",
+          "startStage": 3.999999999999999,
+          "endStage": 3.999999999999999,
+          "gateOwner": "actor1"
+        },
+        {
+          "id": "act_temp_1766527003500",
+          "name": "Contract Signed",
+          "start": 83.33333333333334,
+          "end": 83.33333333333334,
+          "isGate": true,
+          "isDeliverable": false,
+          "predecessor": "act_temp_1766516175905",
+          "predecessors": [
+            "act_temp_1766516175905",
+            "act_temp_1766526863006",
+            "act_temp_1766596976014"
+          ],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "",
+          "activityType": "type_1766520090486",
+          "startStage": 5.000000000000001,
+          "endStage": 5.000000000000001,
+          "gateOwner": "actor1"
+        }
+      ]
+    },
+    {
+      "id": "sl_1766522759342",
+      "name": "Agents",
+      "color": "#11ACEE",
+      "collapsed": false,
+      "sections": [],
+      "activities": [
+        {
+          "id": "act_temp_1766512432588",
+          "name": "Agents Briefing",
+          "start": 2,
+          "end": 15,
+          "isGate": false,
+          "isDeliverable": false,
+          "accountable": "actor1",
+          "responsible": [],
+          "consulted": [],
+          "informed": [],
+          "predecessor": null,
+          "predecessors": [],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "",
+          "startStage": 0.12,
+          "endStage": 0.8999999999999999,
+          "_stageBasedPos": true,
+          "activityType": "type_1766520112399",
+          "stageNotes": {
+            "s1": "The AE describes the usage of Agents as Phase 0 diagnosis to support or highlight opportunities with POM"
+          }
+        },
+        {
+          "id": "act_temp_1766525222981",
+          "name": "Agree to Provide Data",
+          "start": 16.666666666666664,
+          "end": 16.666666666666664,
+          "isGate": true,
+          "isDeliverable": false,
+          "predecessor": "act_temp_1766512432588",
+          "predecessors": [
+            "act_temp_1766512432588"
+          ],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "",
+          "activityType": null,
+          "startStage": 0.9999999999999998,
+          "endStage": 0.9999999999999998,
+          "gateOwner": "actor_1766511499381"
+        },
+        {
+          "id": "act_temp_1766522859492",
+          "name": "Data Received & Validated with Prospect",
+          "start": 18,
+          "end": 31,
+          "isGate": false,
+          "isDeliverable": false,
+          "accountable": "actor1",
+          "responsible": [
+            "actor2"
+          ],
+          "consulted": [
+            "actor_1766511499381"
+          ],
+          "informed": [],
+          "predecessor": "act_temp_1766525222981",
+          "predecessors": [
+            "act_temp_1766525222981"
+          ],
+          "friction": "Data spec might need to be updated. ",
+          "resolution": "Product team: Release self-serve tool for prospects to load and validate data.",
+          "deliverableDetails": "",
+          "notes": "",
+          "activityType": "type_1766520100814",
+          "startStage": 1.08,
+          "endStage": 1.8599999999999999,
+          "stageNotes": {
+            "s2": "Data validation helps determine if data structure will fit accelerator specifications."
+          }
+        },
+        {
+          "id": "act_temp_1766525670134",
+          "name": "Agent Setup & Dry Run",
+          "start": 26,
+          "end": 42,
+          "isGate": false,
+          "isDeliverable": false,
+          "accountable": "actor2",
+          "responsible": [],
+          "consulted": [
+            "actor_1766511499381"
+          ],
+          "informed": [],
+          "predecessor": "act_temp_1766522859492",
+          "predecessors": [
+            "act_temp_1766522859492"
+          ],
+          "friction": "Very manual process today\nLimited selection of agents to deploy\nPurpose built agents setup all manually (Copilot capabilities limited)",
+          "resolution": "MCP tools to facilitate interactive creation of agents (using external LLMs)",
+          "deliverableDetails": "",
+          "notes": "",
+          "activityType": "type_1766520112399",
+          "startStage": 1.56,
+          "endStage": 2.52,
+          "stageNotes": {
+            "s2": "Initial data validation occurs and sandbox environment is setup.",
+            "s3": "SolStrat runs selected agents with Champion with clear linking to Value to capture and how Actions in the system can enable prospect to capture that value. (i.e. LPGs, Quoting, etc)"
+          }
+        },
+        {
+          "id": "act_temp_1766525758399",
+          "name": "Agents Readout",
+          "start": 42,
+          "end": 58,
+          "isGate": false,
+          "isDeliverable": true,
+          "accountable": "actor1",
+          "responsible": [
+            "actor2"
+          ],
+          "consulted": [
+            "actor_1766511499381"
+          ],
+          "informed": [],
+          "predecessor": "act_temp_1766525670134",
+          "predecessors": [
+            "act_temp_1766525670134"
+          ],
+          "friction": "Process can vary wildly from one prospect to another. Need to find what is the approach the works the best.",
+          "resolution": "Work with SolStrat and AE team to document cases that have the most impact and chance to close agents deal.",
+          "deliverableDetails": "Summary of findings from Agents deployed.",
+          "notes": "",
+          "activityType": "type_1766520112399",
+          "startStage": 2.52,
+          "endStage": 3.4799999999999995,
+          "stageNotes": {
+            "s3": "Initial readout, focused on demonstrating quick value through low-hanging fruit actions (curated agents)",
+            "s4": "Determine if a custom agent is required and build it within the sandbox environment."
+          }
+        },
+        {
+          "id": "act_temp_1766530483295",
+          "name": "Value case with Phase 0 \"knockout\" proposal",
+          "start": 52,
+          "end": 65,
+          "isGate": false,
+          "isDeliverable": true,
+          "accountable": "actor1",
+          "responsible": [
+            "actor1",
+            "actor2"
+          ],
+          "consulted": [],
+          "informed": [],
+          "predecessor": "act_temp_1766525758399",
+          "predecessors": [
+            "act_temp_1766525758399"
+          ],
+          "friction": "Lack a document that is easy to populate with this information.",
+          "resolution": "",
+          "deliverableDetails": "Document with all the details about this proposal",
+          "notes": "",
+          "activityType": "type_1766520090486",
+          "startStage": 3.12,
+          "endStage": 3.9000000000000004,
+          "stageNotes": {
+            "s4": "We demonstrate the full ROI of an agents implementation first to guide the POM deal as a quick follow up (i.e. Agents indicate the  \"North Star\")"
+          }
+        },
+        {
+          "id": "act_temp_1766526863006",
+          "name": "Agree to Sign up Agents deal",
+          "start": 66.66666666666666,
+          "end": 66.66666666666666,
+          "isGate": true,
+          "isDeliverable": false,
+          "predecessor": "act_temp_1766525758399",
+          "predecessors": [
+            "act_temp_1766525758399",
+            "act_temp_1766530483295"
+          ],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "We have identified areas of opportunity through agents and shown how these can be used to guide evaluation (Phase 0 - Diagnosis)",
+          "activityType": "type_1766520065758",
+          "startStage": 3.999999999999999,
+          "endStage": 3.999999999999999,
+          "gateOwner": "actor1"
+        },
+        {
+          "id": "act_temp_1766855875866",
+          "name": "Agents handover",
+          "start": 77,
+          "end": 97,
+          "isGate": false,
+          "isDeliverable": true,
+          "accountable": "actor2",
+          "responsible": [
+            "actor2"
+          ],
+          "consulted": [],
+          "informed": [],
+          "predecessor": null,
+          "predecessors": [],
+          "friction": "Need to define format",
+          "resolution": "Leverage existing Monday board, work with CommOps team to create placeholder in SFDC",
+          "deliverableDetails": "Sandbox environment\nFindings readout",
+          "notes": "",
+          "stageNotes": {
+            "s_1766511390686": "Start documentation sharing with delivery team. Ensure all agents shared with prospect are clearly identified and defined as well as what was the value identified.",
+            "s_1766511408645": "Share with delivery team full documentation of agents, value identified (actions), proposal for Phase 0 implementation of agents."
+          },
+          "activityType": "type_1766520138877",
+          "startStage": 4.62,
+          "endStage": 5.82
+        }
+      ]
+    },
+    {
+      "id": "sl_1766511582440",
+      "name": "POM",
+      "color": "#FF6D3C",
+      "collapsed": false,
+      "sections": [],
+      "activities": [
+        {
+          "id": "act_temp_1766596941386",
+          "name": "RFP Management",
+          "start": 18,
+          "end": 48,
+          "isGate": false,
+          "isDeliverable": true,
+          "accountable": "actor1",
+          "responsible": [
+            "actor1",
+            "actor2"
+          ],
+          "consulted": [],
+          "informed": [],
+          "predecessor": null,
+          "predecessors": [],
+          "friction": "Procurement-led opportunities can impact the ability to conduct discovery, dry runs, reverse demos.",
+          "resolution": "Work with AEs on how to identify deals that will have actual closing opportunity vs deals that lack real decision path.",
+          "deliverableDetails": "Full RFP answer (captured in Loopio) and shared with prospect.",
+          "notes": "Receipt of RFP\nValidation of Fit\nProviding answers related to functional, IT, commercial requirements.",
+          "activityType": "type_1766520100814",
+          "startStage": 1.08,
+          "endStage": 2.88,
+          "stageNotes": {
+            "s2": "Receipt of RFP\nValidation of Fit\nProviding answers related to functional, IT, commercial requirements.",
+            "s3": "Address any remaining topics around RFP."
+          }
+        },
+        {
+          "id": "act_temp_1766514015551",
+          "name": "Conduct Discovery with Stakeholders",
+          "start": 18.000000000000004,
+          "end": 32,
+          "isGate": false,
+          "isDeliverable": true,
+          "accountable": "actor1",
+          "responsible": [
+            "actor2"
+          ],
+          "consulted": [
+            "actor1",
+            "actor_1766511499381"
+          ],
+          "informed": [],
+          "predecessor": "act_temp_1766512539274",
+          "predecessors": [
+            "act_temp_1766512539274"
+          ],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "Summary of pain points / challenges with matching value (at least initial)",
+          "notes": "",
+          "startStage": 1.0800000000000003,
+          "endStage": 1.92,
+          "_stageBasedPos": true,
+          "activityType": "type_1766520100814",
+          "stageNotes": {
+            "s2": "Focus discovery on understanding current state, identifying the top 3-5 key objectives for this initiative.\n\nExplore current systems (ERP, CRM, home grown solutions, etc)\n\nStart to identify product fit gaps"
+          }
+        },
+        {
+          "id": "act_temp_1766514172684",
+          "name": "Product Fit-Gap Analysis",
+          "start": 23,
+          "end": 32,
+          "isGate": false,
+          "isDeliverable": true,
+          "accountable": "actor2",
+          "responsible": [
+            "actor2"
+          ],
+          "consulted": [
+            "actor1",
+            "actor_1766511499381"
+          ],
+          "informed": [],
+          "predecessor": "act_temp_1766514015551",
+          "predecessors": [
+            "act_temp_1766514015551"
+          ],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "This creates an everliving document that maps functional requirements to solution capabilities and, more importantly, what needs fall outside of existing Accelerator scope.",
+          "notes": "",
+          "startStage": 1.3800000000000001,
+          "endStage": 1.92,
+          "_stageBasedPos": true,
+          "activityType": "type_1766520100814",
+          "stageNotes": {}
+        },
+        {
+          "id": "act_temp_1766527212539",
+          "name": "Reverse Demo",
+          "start": 29,
+          "end": 40,
+          "isGate": false,
+          "isDeliverable": false,
+          "accountable": "actor1",
+          "responsible": [
+            "actor2"
+          ],
+          "consulted": [],
+          "informed": [],
+          "predecessor": "act_temp_1766514015551",
+          "predecessors": [
+            "act_temp_1766514015551"
+          ],
+          "friction": "Not all prospects will agree to a reverse demo.",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "",
+          "activityType": "type_1766520100814",
+          "startStage": 1.7399999999999998,
+          "endStage": 2.4000000000000004,
+          "stageNotes": {
+            "s2": "Additional validation on top of Discovery to understand current state and layout functional requirements tied to value proposition. (i.e. how are we going to make the current state better)",
+            "s3": "Additional discussions as necessary to clarify functional requirements (post qualification)"
+          }
+        },
+        {
+          "id": "act_temp_1766527116687",
+          "name": "Initial Product Fit Aligned",
+          "start": 33.33333333333333,
+          "end": 33.33333333333333,
+          "isGate": true,
+          "isDeliverable": false,
+          "predecessor": "act_temp_1766514172684",
+          "predecessors": [
+            "act_temp_1766514172684"
+          ],
+          "friction": "Inconsistent documentation process",
+          "resolution": "Make review of these artifacts during pipeline review calls.\n\nCreate easy to spot flags (SFDC / Monday) to highlight opportunities that are missing these artifacts.",
+          "deliverableDetails": "",
+          "notes": "Gate for Stage 1 to Stage 2: Do we have good alignment on product fit, any identified gaps are not significant enough to warrant disqualification of opportunity.",
+          "activityType": "type_1766520100814",
+          "startStage": 1.9999999999999996,
+          "endStage": 1.9999999999999996,
+          "gateOwner": "actor2"
+        },
+        {
+          "id": "act_temp_1766527381109",
+          "name": "Dry Runs with Stakeholders",
+          "start": 36,
+          "end": 49,
+          "isGate": false,
+          "isDeliverable": false,
+          "accountable": "actor1",
+          "responsible": [
+            "actor2"
+          ],
+          "consulted": [],
+          "informed": [],
+          "predecessor": "act_temp_1766514015551",
+          "predecessors": [
+            "act_temp_1766514015551",
+            "act_temp_1766514172684"
+          ],
+          "friction": "Procurement led opportunities can limit dry runs with business team",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "",
+          "activityType": "type_1766520112399",
+          "startStage": 2.16,
+          "endStage": 2.94,
+          "stageNotes": {
+            "s3": "Perform at least one dry run that shows:\n- What we've heard\n- Proposal for solution vision\n- Full path of what we expect to show\n- Mapping to value"
+          }
+        },
+        {
+          "id": "act_temp_1766596932540",
+          "name": "POC Requirements / Setup",
+          "start": 46,
+          "end": 60,
+          "isGate": false,
+          "isDeliverable": false,
+          "accountable": "actor2",
+          "responsible": [
+            "actor2"
+          ],
+          "consulted": [],
+          "informed": [],
+          "predecessor": "act_temp_1766514172684",
+          "predecessors": [
+            "act_temp_1766514172684"
+          ],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "Begin analysis of PoC early in the process.",
+          "activityType": "type_1766520100814",
+          "startStage": 2.7600000000000002,
+          "endStage": 3.5999999999999996,
+          "stageNotes": {
+            "s3": "Determine the need to create a PoC request (i.e. key functional requirements are not readily available in demo environments)",
+            "s4": "Work with prospect to clarify level of detail in functional requirements for a PoC. \nWork with demo team to setup PoC and ready it for a dry run."
+          }
+        },
+        {
+          "id": "act_temp_1766529811011",
+          "name": "Functional Value Alignment",
+          "start": 50,
+          "end": 50,
+          "isGate": true,
+          "isDeliverable": false,
+          "predecessor": "act_temp_1766527381109",
+          "predecessors": [
+            "act_temp_1766527381109"
+          ],
+          "friction": "Lack of documentation to test this exit gate",
+          "resolution": "Leverage Monday / Salesforce to document alignment.",
+          "deliverableDetails": "",
+          "notes": "Prospect confirms that we have alignment in value based on functional requirements after Dry runs",
+          "activityType": null,
+          "startStage": 3,
+          "endStage": 3,
+          "gateOwner": "actor2"
+        },
+        {
+          "id": "act_temp_1766522552151",
+          "name": "Value Based Demo",
+          "start": 51,
+          "end": 61,
+          "isGate": false,
+          "isDeliverable": true,
+          "accountable": "actor2",
+          "responsible": [
+            "actor1",
+            "actor2"
+          ],
+          "consulted": [],
+          "informed": [],
+          "predecessor": "act_temp_1766527381109",
+          "predecessors": [
+            "act_temp_1766527381109",
+            "act_temp_1766529811011"
+          ],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "",
+          "startStage": 3.06,
+          "endStage": 3.66,
+          "_stageBasedPos": true,
+          "activityType": "type_1766520112399",
+          "stageNotes": {
+            "s4": "Conduct demo to prospect for key functional requirements with clear mapping to value."
+          }
+        },
+        {
+          "id": "act_temp_1766728181888",
+          "name": "Conduct PoC Demo",
+          "start": 56,
+          "end": 65,
+          "isGate": false,
+          "isDeliverable": false,
+          "accountable": "actor2",
+          "responsible": [
+            "actor1",
+            "actor2"
+          ],
+          "consulted": [],
+          "informed": [],
+          "predecessor": "act_temp_1766529811011",
+          "predecessors": [
+            "act_temp_1766529811011"
+          ],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "",
+          "activityType": "type_1766520112399",
+          "startStage": 3.3600000000000003,
+          "endStage": 3.9000000000000004,
+          "stageNotes": {
+            "s4": "Conduct demo to prospect for key functional requirements from PoC with clear mapping to value."
+          }
+        },
+        {
+          "id": "act_temp_1766516175905",
+          "name": "Technical Win",
+          "start": 66.66666666666666,
+          "end": 66.66666666666666,
+          "isGate": true,
+          "isDeliverable": true,
+          "predecessor": "act_temp_1766522552151",
+          "predecessors": [
+            "act_temp_1766522552151",
+            "act_temp_1766728181888"
+          ],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "Full documentation of all functional requirements including:\n- Demo assets (standard & PoC)\n- Mapping to catalog of use cases\n- Mapping to value case (Mediafly / Cuvama)\n- Relevant notes, recordings, transcripts, etc.",
+          "notes": "",
+          "startStage": 3.999999999999999,
+          "endStage": 3.999999999999999,
+          "_stageBasedPos": true,
+          "gateOwner": "actor2",
+          "activityType": null
+        },
+        {
+          "id": "act_temp_1766855773853",
+          "name": "Handover Protocol",
+          "start": 76,
+          "end": 98,
+          "isGate": false,
+          "isDeliverable": true,
+          "accountable": "actor1",
+          "responsible": [
+            "actor2"
+          ],
+          "consulted": [],
+          "informed": [],
+          "predecessor": null,
+          "predecessors": [],
+          "friction": "Need to define a handover protocol.",
+          "resolution": "Work with delivery team and ecosystem team on a format.",
+          "deliverableDetails": "Full documentation of functional requirements (Demo, PoC assets, etc)",
+          "notes": "",
+          "stageNotes": {},
+          "activityType": "type_1766520138877",
+          "startStage": 4.5600000000000005,
+          "endStage": 5.88
+        }
+      ]
+    }
+  ],
+  "activityTypes": [
+    {
+      "id": "type_1766520065758",
+      "name": "DECISION PATH",
+      "color": "#a371f7"
+    },
+    {
+      "id": "type_1766520090486",
+      "name": "COMMERCIALS",
+      "color": "#56d364"
+    },
+    {
+      "id": "type_1766520100814",
+      "name": "PRODUCT FIT",
+      "color": "#58a6ff"
+    },
+    {
+      "id": "type_1766520112399",
+      "name": "VALUE CASE",
+      "color": "#F7DC6F"
+    },
+    {
+      "id": "type_1766520138877",
+      "name": "HANDOVER",
+      "color": "#f0883e"
+    }
+  ],
+  "activityColumnWidth": 380
+};
+
+    // Auto-load embedded data on page load
+    window.addEventListener('DOMContentLoaded', function() {
+        if (EMBEDDED_DATA) {
+            console.log('Loading embedded data...');
+            document.getElementById('project-name').textContent = 'PFX Sales Cycle Framework';
+            ganttData = EMBEDDED_DATA;
+            initializeViewer();
+        }
+    });
+    
+
+// Sales Cycle Stage Viewer
+let ganttData = null;
+let currentStageIndex = 0;
+
+// Theme management
+function toggleTheme() {
+    const html = document.documentElement;
+    const currentTheme = html.classList.contains('light') ? 'light' : 'dark';
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+
+    if (newTheme === 'light') {
+        html.classList.add('light');
+    } else {
+        html.classList.remove('light');
+    }
+
+    const icon = document.getElementById('theme-icon');
+    const label = document.getElementById('theme-label');
+    if (newTheme === 'dark') {
+        icon.textContent = '🌙';
+        label.textContent = 'Dark';
+    } else {
+        icon.textContent = '☀️';
+        label.textContent = 'Light';
+    }
+
+    localStorage.setItem('theme', newTheme);
+}
+
+// Load theme on startup
+function loadTheme() {
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+
+    if (savedTheme === 'light') {
+        document.documentElement.classList.add('light');
+    } else {
+        document.documentElement.classList.remove('light');
+    }
+
+    const icon = document.getElementById('theme-icon');
+    const label = document.getElementById('theme-label');
+    if (savedTheme === 'dark') {
+        icon.textContent = '🌙';
+        label.textContent = 'Dark';
+    } else {
+        icon.textContent = '☀️';
+        label.textContent = 'Light';
+    }
+}
+
+// Font size management
+function changeFontSize(size) {
+    const body = document.body;
+    body.classList.remove('font-size-small', 'font-size-medium', 'font-size-large');
+    body.classList.add('font-size-' + size);
+    localStorage.setItem('fontSize', size);
+}
+
+// Load font size on startup
+function loadFontSize() {
+    const savedSize = localStorage.getItem('fontSize') || 'medium';
+    const selector = document.getElementById('font-size-selector');
+    if (selector) {
+        selector.value = savedSize;
+    }
+    changeFontSize(savedSize);
+}
+
+// Load JSON file
+function loadJSONFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            ganttData = JSON.parse(e.target.result);
+            document.getElementById('project-name').textContent = file.name.replace('.json', '');
+            initializeViewer();
+        } catch (error) {
+            alert('Error loading JSON file: ' + error.message);
+        }
+    };
+    reader.readAsText(file);
+}
+
+// Initialize the viewer
+function initializeViewer() {
+    if (!ganttData || !ganttData.stages || ganttData.stages.length === 0) {
+        alert('Invalid JSON file: No stages found');
+        return;
+    }
+
+    // Hide no-data message, show content
+    document.getElementById('no-data').style.display = 'none';
+    document.getElementById('legend-container').style.display = 'block';
+    document.getElementById('stage-tabs-container').style.display = 'block';
+    document.getElementById('kanban-board').style.display = 'flex';
+
+    // Render legend
+    renderLegend();
+
+    // Render stage tabs
+    renderStageTabs();
+
+    // Render first stage by default
+    currentStageIndex = 0;
+    renderStage(currentStageIndex);
+}
+
+// Render legend
+function renderLegend() {
+    const container = document.getElementById('legend');
+    let html = '';
+
+    // Add activity types
+    if (ganttData.activityTypes && ganttData.activityTypes.length > 0) {
+        html += `<div class="legend-header">Activity Types:</div>`;
+        ganttData.activityTypes.forEach(type => {
+            html += `<div class="legend-item"><div class="legend-bar" style="background:${type.color}"></div>${type.name}</div>`;
+        });
+
+        // Add separator between activity types and actors
+        if (ganttData.actors && ganttData.actors.length > 0) {
+            html += `<div class="legend-separator"></div>`;
+        }
+    }
+
+    // Add actors
+    if (ganttData.actors && ganttData.actors.length > 0) {
+        html += `<div class="legend-header">Actors:</div>`;
+        ganttData.actors.forEach(actor => {
+            html += `<div class="legend-item"><div class="legend-bar" style="background:${actor.color}"></div>${actor.name}</div>`;
+        });
+    }
+
+    container.innerHTML = html;
+}
+
+// Render stage tabs
+function renderStageTabs() {
+    const container = document.getElementById('stage-tabs');
+    container.innerHTML = '';
+
+    ganttData.stages.forEach((stage, index) => {
+        const tab = document.createElement('button');
+        tab.className = 'stage-tab';
+        tab.style.borderColor = stage.color || '#58a6ff';
+        if (index === currentStageIndex) {
+            tab.classList.add('active');
+            tab.style.color = stage.color || '#58a6ff';
+        }
+        tab.textContent = `${stage.num}. ${stage.name}`;
+        tab.onclick = () => switchStage(index);
+        container.appendChild(tab);
+    });
+}
+
+// Switch to a different stage
+function switchStage(index) {
+    currentStageIndex = index;
+    renderStageTabs();
+    renderStage(index);
+}
+
+// Render a specific stage as kanban board
+function renderStage(stageIndex) {
+    const stage = ganttData.stages[stageIndex];
+    const stageWidth = 100 / ganttData.stages.length;
+    const stageStart = stageIndex * stageWidth;
+    const stageEnd = (stageIndex + 1) * stageWidth;
+
+    const board = document.getElementById('kanban-board');
+    board.innerHTML = '';
+
+    // Collect all gates and regular activities separately
+    const allGates = [];
+
+    // For each swimlane, create a kanban column
+    ganttData.swimlanes.forEach(swimlane => {
+        const { activities, gates } = getAllActivitiesForStage(swimlane, stageStart, stageEnd, stage.id);
+
+        // Collect gates with swimlane info
+        gates.forEach(gate => {
+            allGates.push({ ...gate, swimlane: swimlane });
+        });
+
+        // Only show column if it has non-gate activities in this stage
+        if (activities.length === 0) return;
+
+        const column = createKanbanColumn(swimlane, activities, stage);
+        board.appendChild(column);
+    });
+
+    // Add gates column if there are any gates
+    if (allGates.length > 0) {
+        const gatesColumn = createGatesColumn(allGates, stage);
+        board.appendChild(gatesColumn);
+    }
+
+    // If no activities in any swimlane, show message
+    if (board.children.length === 0) {
+        board.innerHTML = '<div class="no-data-message"><h2>No activities in this stage</h2></div>';
+    }
+}
+
+// Get all activities for a swimlane that overlap with a stage, separated by gates
+function getAllActivitiesForStage(swimlane, stageStart, stageEnd, stageId) {
+    const activities = [];
+    const gates = [];
+
+    // Get swimlane-level activities
+    if (swimlane.activities) {
+        swimlane.activities.forEach(act => {
+            if (act.end > stageStart && act.start <= stageEnd) {
+                const actWithSection = { ...act, section: null };
+                if (act.isGate) {
+                    gates.push(actWithSection);
+                } else {
+                    activities.push(actWithSection);
+                }
+            }
+        });
+    }
+
+    // Get section activities
+    if (swimlane.sections) {
+        swimlane.sections.forEach(section => {
+            if (section.activities) {
+                section.activities.forEach(act => {
+                    if (act.end > stageStart && act.start <= stageEnd) {
+                        const actWithSection = { ...act, section: section.name };
+                        if (act.isGate) {
+                            gates.push(actWithSection);
+                        } else {
+                            activities.push(actWithSection);
+                        }
+                    }
+                });
+            }
+        });
+    }
+
+    return { activities, gates };
+}
+
+// Create kanban column for a swimlane
+function createKanbanColumn(swimlane, activities, stage) {
+    const column = document.createElement('div');
+    column.className = 'kanban-column';
+
+    const header = document.createElement('div');
+    header.className = 'kanban-column-header';
+    const swimlaneColor = swimlane.color || '#58a6ff';
+    header.style.borderBottomColor = swimlaneColor;
+
+    const title = document.createElement('h3');
+    title.className = 'kanban-column-title';
+    title.textContent = swimlane.name;
+    title.style.color = swimlaneColor;
+
+    const count = document.createElement('div');
+    count.className = 'kanban-column-count';
+    count.style.color = swimlaneColor;
+    count.textContent = `${activities.length} ${activities.length === 1 ? 'activity' : 'activities'}`;
+
+    header.appendChild(title);
+    header.appendChild(count);
+
+    const cardsContainer = document.createElement('div');
+    cardsContainer.className = 'kanban-cards';
+
+    // Group activities by activity type
+    const groupedActivities = {};
+    activities.forEach(activity => {
+        const typeId = activity.activityType || 'none';
+        if (!groupedActivities[typeId]) {
+            groupedActivities[typeId] = [];
+        }
+        groupedActivities[typeId].push(activity);
+    });
+
+    // Render activities grouped by type
+    Object.keys(groupedActivities).forEach(typeId => {
+        groupedActivities[typeId].forEach(activity => {
+            const card = createActivityCard(activity, stage);
+            cardsContainer.appendChild(card);
+        });
+    });
+
+    column.appendChild(header);
+    column.appendChild(cardsContainer);
+
+    // Add resize handle
+    const resizeHandle = document.createElement('div');
+    resizeHandle.className = 'column-resize-handle';
+    resizeHandle.addEventListener('mousedown', (e) => startColumnResize(e, column));
+    column.appendChild(resizeHandle);
+
+    return column;
+}
+
+// Create gates column
+function createGatesColumn(gates, stage) {
+    const column = document.createElement('div');
+    column.className = 'kanban-column gates-column';
+
+    const header = document.createElement('div');
+    header.className = 'kanban-column-header';
+    header.style.borderBottomColor = '#f85149';
+
+    const title = document.createElement('h3');
+    title.className = 'kanban-column-title';
+    title.textContent = '🚪 Exit Gates';
+    title.style.color = '#f85149';
+
+    const count = document.createElement('div');
+    count.className = 'kanban-column-count';
+    count.style.color = '#f85149';
+    count.textContent = `${gates.length} ${gates.length === 1 ? 'gate' : 'gates'}`;
+
+    header.appendChild(title);
+    header.appendChild(count);
+
+    const cardsContainer = document.createElement('div');
+    cardsContainer.className = 'kanban-cards';
+
+    gates.forEach(gate => {
+        const card = createActivityCard(gate, stage);
+        cardsContainer.appendChild(card);
+    });
+
+    column.appendChild(header);
+    column.appendChild(cardsContainer);
+
+    // Add resize handle
+    const resizeHandle = document.createElement('div');
+    resizeHandle.className = 'column-resize-handle';
+    resizeHandle.addEventListener('mousedown', (e) => startColumnResize(e, column));
+    column.appendChild(resizeHandle);
+
+    return column;
+}
+
+// Create activity card
+function createActivityCard(activity, stage) {
+    const card = document.createElement('div');
+    card.className = 'activity-card';
+
+    // Get activity type info
+    let typeColor = '#58a6ff';
+    let typeName = 'Activity';
+    if (activity.activityType && ganttData.activityTypes) {
+        const actType = ganttData.activityTypes.find(t => t.id === activity.activityType);
+        if (actType) {
+            typeColor = actType.color;
+            typeName = actType.name;
+        }
+    }
+
+    // Card header with title and RACI matrix
+    const header = document.createElement('div');
+    header.className = 'card-header';
+
+    const headerLeft = document.createElement('div');
+    headerLeft.className = 'card-header-left';
+
+    const typeIndicator = document.createElement('div');
+    typeIndicator.className = 'card-type-indicator';
+    typeIndicator.style.background = typeColor;
+
+    const titleSection = document.createElement('div');
+    titleSection.className = 'card-title-section';
+
+    const title = document.createElement('h4');
+    title.className = 'card-title';
+    title.style.color = typeColor;
+    title.textContent = activity.name;
+    if (activity.section) {
+        title.textContent += ` (${activity.section})`;
+    }
+
+    const badges = document.createElement('div');
+    badges.className = 'card-badges';
+
+    // Only show deliverable badge if there are no deliverable details
+    if (activity.isDeliverable && !activity.deliverableDetails) {
+        const badge = document.createElement('span');
+        badge.className = 'card-badge deliverable';
+        badge.textContent = 'Deliverable';
+        badges.appendChild(badge);
+    }
+
+    titleSection.appendChild(title);
+    if (badges.children.length > 0) {
+        titleSection.appendChild(badges);
+    }
+
+    headerLeft.appendChild(typeIndicator);
+    headerLeft.appendChild(titleSection);
+    header.appendChild(headerLeft);
+
+    // RACI matrix on the right (if not a gate)
+    if (!activity.isGate && ganttData.actors) {
+        const raciMatrix = createRACIMatrix(activity);
+        if (raciMatrix) header.appendChild(raciMatrix);
+    }
+
+    card.appendChild(header);
+
+    // Swimlane indicator for gates (when shown in gates column)
+    if (activity.isGate && activity.swimlane) {
+        const swimlaneIndicator = document.createElement('div');
+        swimlaneIndicator.className = 'card-swimlane-indicator';
+        swimlaneIndicator.style.borderLeftColor = activity.swimlane.color || '#58a6ff';
+
+        const label = document.createElement('span');
+        label.className = 'swimlane-label';
+        label.textContent = 'Swimlane:';
+
+        const name = document.createElement('span');
+        name.className = 'swimlane-name';
+        name.style.color = activity.swimlane.color || '#58a6ff';
+        name.textContent = activity.swimlane.name;
+
+        swimlaneIndicator.appendChild(label);
+        swimlaneIndicator.appendChild(name);
+        card.appendChild(swimlaneIndicator);
+    }
+
+    // Gate owner (if gate)
+    if (activity.isGate && activity.gateOwner && ganttData.actors) {
+        const gateSection = createGateOwnerSection(activity);
+        if (gateSection) card.appendChild(gateSection);
+    }
+
+    // Dependencies
+    if (activity.predecessor) {
+        const depSection = createDependencySection(activity);
+        if (depSection) card.appendChild(depSection);
+    }
+
+    // Stage-specific notes (prioritized)
+    if (activity.stageNotes && activity.stageNotes[stage.id]) {
+        const notesSection = createStageNotesSection(activity.stageNotes[stage.id], stage);
+        card.appendChild(notesSection);
+    }
+
+    // Deliverable details
+    if (activity.isDeliverable && activity.deliverableDetails) {
+        const delivSection = createDeliverableSection(activity.deliverableDetails);
+        card.appendChild(delivSection);
+    }
+
+    // Friction
+    if (activity.friction) {
+        const frictionSection = createFrictionSection(activity.friction);
+        card.appendChild(frictionSection);
+    }
+
+    // General notes (only if no stage-specific notes)
+    if (activity.notes && (!activity.stageNotes || !activity.stageNotes[stage.id])) {
+        const notesSection = createGeneralNotesSection(activity.notes);
+        card.appendChild(notesSection);
+    }
+
+    return card;
+}
+
+// Create RACI matrix (compact grid on card header)
+function createRACIMatrix(activity) {
+    const hasRaci = activity.accountable ||
+                    (activity.responsible && activity.responsible.length > 0) ||
+                    (activity.consulted && activity.consulted.length > 0) ||
+                    (activity.informed && activity.informed.length > 0);
+
+    if (!hasRaci) return null;
+
+    const matrix = document.createElement('div');
+    matrix.className = 'raci-matrix';
+
+    // Collect all actors by role
+    const roles = [];
+
+    if (activity.accountable) {
+        const actor = ganttData.actors.find(a => a.id === activity.accountable);
+        if (actor) roles.push({ role: 'A', actor, tooltip: 'Accountable' });
+    }
+
+    if (activity.responsible && activity.responsible.length > 0) {
+        activity.responsible.forEach(rId => {
+            const actor = ganttData.actors.find(a => a.id === rId);
+            if (actor) roles.push({ role: 'R', actor, tooltip: 'Responsible' });
+        });
+    }
+
+    if (activity.consulted && activity.consulted.length > 0) {
+        activity.consulted.forEach(cId => {
+            const actor = ganttData.actors.find(a => a.id === cId);
+            if (actor) roles.push({ role: 'C', actor, tooltip: 'Consulted' });
+        });
+    }
+
+    if (activity.informed && activity.informed.length > 0) {
+        activity.informed.forEach(iId => {
+            const actor = ganttData.actors.find(a => a.id === iId);
+            if (actor) roles.push({ role: 'I', actor, tooltip: 'Informed' });
+        });
+    }
+
+    // Create grid items
+    roles.forEach(({ role, actor, tooltip }) => {
+        const item = document.createElement('div');
+        item.className = 'raci-matrix-item';
+        item.title = `${tooltip}: ${actor.name}`;
+
+        const box = document.createElement('div');
+        box.className = 'raci-actor-box';
+        box.style.background = actor.color;
+
+        // Get initials
+        const words = actor.name.trim().split(/\s+/);
+        let initials;
+        if (words.length === 1) {
+            initials = words[0].substring(0, 2).toUpperCase();
+        } else {
+            initials = words.slice(0, 2).map(w => w[0]).join('').toUpperCase();
+        }
+        box.textContent = initials;
+
+        const roleLabel = document.createElement('span');
+        roleLabel.className = 'raci-role-label';
+        roleLabel.textContent = role;
+
+        item.appendChild(box);
+        item.appendChild(roleLabel);
+        matrix.appendChild(item);
+    });
+
+    return matrix;
+}
+
+// Create dependency section
+function createDependencySection(activity) {
+    if (!activity.predecessor) return null;
+
+    const section = document.createElement('div');
+    section.className = 'card-info-row';
+
+    const icon = document.createElement('span');
+    icon.className = 'info-icon';
+    icon.textContent = '🔗';
+
+    const label = document.createElement('span');
+    label.className = 'info-label';
+    label.textContent = 'Depends on:';
+
+    const value = document.createElement('span');
+    value.className = 'info-value';
+
+    // Find predecessor activity name
+    let predName = activity.predecessor;
+    ganttData.swimlanes.forEach(sl => {
+        if (sl.activities) {
+            const pred = sl.activities.find(a => a.id === activity.predecessor);
+            if (pred) predName = pred.name;
+        }
+        if (sl.sections) {
+            sl.sections.forEach(sec => {
+                if (sec.activities) {
+                    const pred = sec.activities.find(a => a.id === activity.predecessor);
+                    if (pred) predName = pred.name;
+                }
+            });
+        }
+    });
+
+    value.textContent = predName;
+
+    section.appendChild(icon);
+    section.appendChild(label);
+    section.appendChild(value);
+
+    return section;
+}
+
+// Create stage-specific notes section
+function createStageNotesSection(notes, stage) {
+    const section = document.createElement('div');
+    section.className = 'card-stage-notes';
+
+    const header = document.createElement('div');
+    header.className = 'stage-notes-header';
+    header.style.color = 'white';
+    header.textContent = '📌 Notes';
+
+    const text = document.createElement('p');
+    text.className = 'card-notes-text';
+    text.textContent = notes;
+
+    section.appendChild(header);
+    section.appendChild(text);
+    return section;
+}
+
+// Create general notes section
+function createGeneralNotesSection(notes) {
+    const section = document.createElement('div');
+    section.className = 'card-general-notes';
+
+    const text = document.createElement('p');
+    text.className = 'card-notes-text';
+    text.textContent = notes;
+
+    section.appendChild(text);
+    return section;
+}
+
+// Create RACI section (old version - keeping for compatibility)
+function createRACISection(activity) {
+    const hasRaci = activity.accountable ||
+                    (activity.responsible && activity.responsible.length > 0) ||
+                    (activity.consulted && activity.consulted.length > 0) ||
+                    (activity.informed && activity.informed.length > 0);
+
+    if (!hasRaci) return null;
+
+    const section = document.createElement('div');
+    section.className = 'card-section';
+
+    const title = document.createElement('div');
+    title.className = 'card-section-title';
+    title.textContent = 'RACI Assignments';
+    section.appendChild(title);
+
+    const raciContainer = document.createElement('div');
+    raciContainer.className = 'card-raci';
+
+    // Accountable
+    if (activity.accountable) {
+        const actor = ganttData.actors.find(a => a.id === activity.accountable);
+        if (actor) {
+            const item = createRACIItem('A', actor);
+            raciContainer.appendChild(item);
+        }
+    }
+
+    // Responsible
+    if (activity.responsible && activity.responsible.length > 0) {
+        activity.responsible.forEach(rId => {
+            const actor = ganttData.actors.find(a => a.id === rId);
+            if (actor) {
+                const item = createRACIItem('R', actor);
+                raciContainer.appendChild(item);
+            }
+        });
+    }
+
+    // Consulted
+    if (activity.consulted && activity.consulted.length > 0) {
+        activity.consulted.forEach(cId => {
+            const actor = ganttData.actors.find(a => a.id === cId);
+            if (actor) {
+                const item = createRACIItem('C', actor);
+                raciContainer.appendChild(item);
+            }
+        });
+    }
+
+    // Informed
+    if (activity.informed && activity.informed.length > 0) {
+        activity.informed.forEach(iId => {
+            const actor = ganttData.actors.find(a => a.id === iId);
+            if (actor) {
+                const item = createRACIItem('I', actor);
+                raciContainer.appendChild(item);
+            }
+        });
+    }
+
+    section.appendChild(raciContainer);
+    return section;
+}
+
+// Create RACI item
+function createRACIItem(role, actor) {
+    const item = document.createElement('div');
+    item.className = 'card-raci-item';
+
+    const box = document.createElement('div');
+    box.className = 'card-actor-box';
+    box.style.background = actor.color;
+
+    // Get initials
+    const words = actor.name.trim().split(/\s+/);
+    let initials;
+    if (words.length === 1) {
+        initials = words[0].substring(0, 2).toUpperCase();
+    } else {
+        initials = words.slice(0, 2).map(w => w[0]).join('').toUpperCase();
+    }
+    box.textContent = initials;
+
+    const label = document.createElement('span');
+    label.className = 'card-raci-label';
+    label.textContent = role + ':';
+
+    const name = document.createElement('span');
+    name.className = 'card-raci-name';
+    name.textContent = actor.name;
+
+    item.appendChild(box);
+    item.appendChild(label);
+    item.appendChild(name);
+
+    return item;
+}
+
+// Create gate owner section
+function createGateOwnerSection(activity) {
+    const actor = ganttData.actors.find(a => a.id === activity.gateOwner);
+    if (!actor) return null;
+
+    const section = document.createElement('div');
+    section.className = 'card-info-row';
+
+    const icon = document.createElement('span');
+    icon.className = 'info-icon';
+    icon.textContent = '👤';
+
+    const label = document.createElement('span');
+    label.className = 'info-label';
+    label.textContent = 'Gate Owner:';
+
+    const box = document.createElement('div');
+    box.className = 'raci-actor-box';
+    box.style.background = actor.color;
+    box.style.width = '28px';
+    box.style.height = '28px';
+    box.style.fontSize = '11px';
+
+    // Get initials
+    const words = actor.name.trim().split(/\s+/);
+    let initials;
+    if (words.length === 1) {
+        initials = words[0].substring(0, 2).toUpperCase();
+    } else {
+        initials = words.slice(0, 2).map(w => w[0]).join('').toUpperCase();
+    }
+    box.textContent = initials;
+
+    const name = document.createElement('span');
+    name.className = 'info-value';
+    name.textContent = actor.name;
+
+    section.appendChild(icon);
+    section.appendChild(label);
+    section.appendChild(box);
+    section.appendChild(name);
+
+    return section;
+}
+
+// Create notes section
+function createNotesSection(notes, stage) {
+    const section = document.createElement('div');
+    section.className = 'card-notes';
+    section.style.borderLeftColor = stage.color || '#58a6ff';
+
+    const text = document.createElement('p');
+    text.className = 'card-notes-text';
+    text.textContent = notes;
+
+    section.appendChild(text);
+    return section;
+}
+
+// Create deliverable section
+function createDeliverableSection(details) {
+    const section = document.createElement('div');
+    section.className = 'card-section';
+
+    const title = document.createElement('div');
+    title.className = 'card-section-title';
+    title.textContent = '📄 Deliverable';
+    section.appendChild(title);
+
+    const text = document.createElement('p');
+    text.className = 'card-notes-text';
+    text.textContent = details;
+
+    section.appendChild(text);
+    return section;
+}
+
+// Create friction section
+function createFrictionSection(friction) {
+    const section = document.createElement('div');
+    section.className = 'card-section friction';
+
+    const title = document.createElement('div');
+    title.className = 'card-section-title';
+    title.textContent = '⚠️ Friction';
+    section.appendChild(title);
+
+    const text = document.createElement('p');
+    text.className = 'card-notes-text';
+    text.textContent = friction;
+
+    section.appendChild(text);
+    return section;
+}
+
+// Helper function to get contrasting text color
+function getContrastingTextColor(hexColor) {
+    const r = parseInt(hexColor.slice(1, 3), 16);
+    const g = parseInt(hexColor.slice(3, 5), 16);
+    const b = parseInt(hexColor.slice(5, 7), 16);
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance > 0.5 ? '#000000' : '#ffffff';
+}
+
+// Column resize functionality
+let resizingColumn = null;
+let resizeStartX = 0;
+let resizeStartWidth = 0;
+
+function startColumnResize(e, column) {
+    e.preventDefault();
+    resizingColumn = column;
+    resizeStartX = e.clientX;
+    resizeStartWidth = column.offsetWidth;
+
+    document.addEventListener('mousemove', doColumnResize);
+    document.addEventListener('mouseup', stopColumnResize);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+}
+
+function doColumnResize(e) {
+    if (!resizingColumn) return;
+
+    const deltaX = e.clientX - resizeStartX;
+    const newWidth = resizeStartWidth + deltaX;
+
+    // Respect min width
+    const minWidth = 280;
+    const clampedWidth = Math.max(minWidth, newWidth);
+
+    // Override flex with fixed width
+    resizingColumn.style.flex = 'none';
+    resizingColumn.style.width = clampedWidth + 'px';
+}
+
+function stopColumnResize() {
+    resizingColumn = null;
+    document.removeEventListener('mousemove', doColumnResize);
+    document.removeEventListener('mouseup', stopColumnResize);
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+}
+
+// Initialize
+loadTheme();
+loadFontSize();
+
+</script>
+</body>
+</html>

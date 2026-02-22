@@ -1,0 +1,978 @@
+{
+  "stages": [
+    {
+      "id": "s1",
+      "num": "0",
+      "name": "Pre-Qualification",
+      "color": "#f85149"
+    },
+    {
+      "id": "s2",
+      "num": "1",
+      "name": "Qualify",
+      "color": "#f0883e"
+    },
+    {
+      "id": "s3",
+      "num": "2",
+      "name": "Value Scenario",
+      "color": "#ffd33d"
+    },
+    {
+      "id": "s4",
+      "num": "3",
+      "name": "Value Proposal",
+      "color": "#79c0ff"
+    },
+    {
+      "id": "s_1766511390686",
+      "num": "4",
+      "name": "Closing",
+      "color": "#368EF2"
+    },
+    {
+      "id": "s_1766511408645",
+      "num": "5",
+      "name": "Closed",
+      "color": "#56d364"
+    }
+  ],
+  "actors": [
+    {
+      "id": "actor1",
+      "name": "Account Executive",
+      "color": "#06934A"
+    },
+    {
+      "id": "actor2",
+      "name": "Solution Strategist",
+      "color": "#FAAB00"
+    },
+    {
+      "id": "actor_1766511499381",
+      "name": "Prospect",
+      "color": "#DA37FB"
+    }
+  ],
+  "swimlanes": [
+    {
+      "id": "sl_1766511565910",
+      "name": "Deal Orchestration",
+      "color": "#00F0B4",
+      "collapsed": false,
+      "sections": [],
+      "activities": [
+        {
+          "id": "act_temp_1766513921669",
+          "name": "Introduction Pre-Discovery",
+          "start": 2,
+          "end": 15,
+          "isGate": false,
+          "isDeliverable": true,
+          "accountable": "actor1",
+          "responsible": [],
+          "consulted": [],
+          "informed": [],
+          "predecessor": null,
+          "predecessors": [],
+          "friction": "Inconsistent qualification across opportunities with many being procurement-led.",
+          "resolution": "",
+          "deliverableDetails": "- Initial understanding of pain points, current state\n- Trigger event that lead to introductory call\n- Company briefing to share with internal team",
+          "notes": "",
+          "startStage": 0.12,
+          "endStage": 0.8999999999999999,
+          "_stageBasedPos": true,
+          "activityType": "type_1766520065758",
+          "stageNotes": {
+            "s1": "Opportunity has not been qualified, we can have introductory calls, shared recorded demos, and nurture the opportunity to build a case to qualify it."
+          }
+        },
+        {
+          "id": "act_temp_1766512539274",
+          "name": "Agree to Discovery",
+          "start": 16.666666666666664,
+          "end": 16.666666666666664,
+          "isGate": true,
+          "isDeliverable": false,
+          "predecessor": "act_temp_1766513921669",
+          "predecessors": [
+            "act_temp_1766513921669"
+          ],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "The prospect is agreeing to meeting with Solution Strategist to explain current state",
+          "startStage": 0.9999999999999998,
+          "endStage": 0.9999999999999998,
+          "_stageBasedPos": true,
+          "gateOwner": "actor_1766511499381",
+          "activityType": null
+        },
+        {
+          "id": "act_temp_1766530407359",
+          "name": "Mediafly DSR Created",
+          "start": 16.666666666666664,
+          "end": 16.666666666666664,
+          "isGate": true,
+          "isDeliverable": false,
+          "predecessor": null,
+          "predecessors": [],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "Use standard assets, build action plan and share it with prospect.",
+          "activityType": "type_1766520112399",
+          "startStage": 0.9999999999999998,
+          "endStage": 0.9999999999999998,
+          "stageNotes": {},
+          "gateOwner": "actor1"
+        },
+        {
+          "id": "act_temp_1766526616432",
+          "name": "Player MAP Management",
+          "start": 18,
+          "end": 81,
+          "isGate": false,
+          "isDeliverable": false,
+          "accountable": "actor1",
+          "responsible": [],
+          "consulted": [
+            "actor_1766511499381"
+          ],
+          "informed": [],
+          "predecessor": null,
+          "predecessors": [],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "Multiple stakeholders that will need to provide sign-off for the deal (ELT process)",
+          "activityType": "type_1766520065758",
+          "startStage": 1.08,
+          "endStage": 4.86,
+          "stageNotes": {
+            "s2": "Do we have a player MAP defined with the multiple Power stakeholders that will need to provide “sign-off” for deal? (think ELT process)",
+            "s3": "Do we have access to decision makers through our Champion? Who are the x-functional decision makers and what is their POV on the project? This is both pros and cons.",
+            "s4": "Are we connected to power? T2T, x-functional, are they part of reference calls?",
+            "s_1766511390686": "Are Exec Sponsors and Coach actively engaging in negotiating. Important to provide “sanity check” on procurement/legal discussions."
+          }
+        },
+        {
+          "id": "act_temp_1766728653312",
+          "name": "Competitive Landscape",
+          "start": 18,
+          "end": 81,
+          "isGate": false,
+          "isDeliverable": false,
+          "accountable": "actor1",
+          "responsible": [],
+          "consulted": [
+            "actor_1766511499381"
+          ],
+          "informed": [],
+          "predecessor": null,
+          "predecessors": [],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "",
+          "activityType": "type_1766520065758",
+          "startStage": 1.08,
+          "endStage": 4.86,
+          "stageNotes": {
+            "s2": "Do we understand the competition in the deal? Are there current processes and tools in place?",
+            "s3": "Express the footholds we have and value we can drive, with a TTV focus (i.e. Agents)\nWhat are our blindspots & weknesses, how are we covering them?",
+            "s4": "If still competitive, why are we on Stage 3? What \"selling\" steps are left to win their bid? How are we using our coach and access to power to beat the competition?",
+            "s_1766511390686": "If still competitive - What evidence do we have that we are not negotiating to the lowest bidder? Should we be in S3?"
+          }
+        },
+        {
+          "id": "act_temp_1766530681277",
+          "name": "Ecosystem / SI Discussion",
+          "start": 18,
+          "end": 81,
+          "isGate": false,
+          "isDeliverable": false,
+          "accountable": "actor1",
+          "responsible": [],
+          "consulted": [],
+          "informed": [],
+          "predecessor": null,
+          "predecessors": [],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "",
+          "activityType": "type_1766520065758",
+          "startStage": 1.08,
+          "endStage": 4.86,
+          "stageNotes": {
+            "s2": "What SIs are we recommending for the project? Understand fi it's a prospect requirement to go through a \"SI bid\" process.",
+            "s3": "Introduce recommendeed SI (have a back up plan)",
+            "s4": "SI has been introduced, we have clear understanding of SI process and if SaaS can go ahead of SOW",
+            "s_1766511390686": "SOW is in process with selected SI. AEs are working with SI to ensure their closing process is running alognside of SaaS (VERY IMPORTANT, unless communicated by prospect that SaaS can go ahead of SOW)"
+          }
+        },
+        {
+          "id": "act_temp_1766902363709",
+          "name": "Budget Path",
+          "start": 18,
+          "end": 81,
+          "isGate": false,
+          "isDeliverable": false,
+          "accountable": "actor1",
+          "responsible": [],
+          "consulted": [],
+          "informed": [],
+          "predecessor": null,
+          "predecessors": [],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "",
+          "stageNotes": {
+            "s2": "Have we communicated the minimal cost of Agents as compared to Value? If POM, understanding of the price-tag associated. Does the prospect understand the path to budget at a high level?",
+            "s3": "What is the path to budget and WHO holds the money? DO we have a \"knockout punch\" offer that will move the deal?",
+            "s4": "Clearly if the money as been allocated for project or what is the path and approval process to budget? Who has approvals on money? if it is with an IT o CFO spend, is there other sign-off required before getting budget?\n\nEnsure that ALL proposals include \"give/gets\", \"time fencing\" and high-level understanding of next steps.",
+            "s_1766511390686": "Path to money is clear with timing. If the path to money is >60 days, should we be in S4?"
+          },
+          "activityType": "type_1766520090486",
+          "startStage": 1.08,
+          "endStage": 4.86
+        },
+        {
+          "id": "act_temp_1766723747925",
+          "name": "References / Case Studies",
+          "start": 18,
+          "end": 81,
+          "isGate": false,
+          "isDeliverable": false,
+          "accountable": "actor1",
+          "responsible": [],
+          "consulted": [
+            "actor2"
+          ],
+          "informed": [],
+          "predecessor": null,
+          "predecessors": [],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "",
+          "startStage": 1.08,
+          "endStage": 4.86,
+          "activityType": "type_1766520112399",
+          "stageNotes": {
+            "s2": "Have we introduced \"like\" customers, pains solved and VALUE received from their partnership with PFX?",
+            "s3": "Have we expressed the value the prospect will receive? Introductions into \"like\" customers for references. Do we feel \"connected\" as evidenced by access to decision maker, onsites and validated by third parties (i.e. GTM partners like SAP)",
+            "s4": "Is prospect connected with customers, partners, executives to find out more about PFX?",
+            "s_1766511390686": "How involved is Prospect? Are multiple stakeholders getting engaged with selected SI, discussing the project? Do we have other indicators of involvement? Are AEs creating moments of connection?"
+          }
+        },
+        {
+          "id": "act_temp_1766525964976",
+          "name": "Pain point clearly identified",
+          "start": 33.33333333333333,
+          "end": 33.33333333333333,
+          "isGate": true,
+          "isDeliverable": false,
+          "predecessor": null,
+          "predecessors": [],
+          "friction": "Pain point documentation is inconsistent.",
+          "resolution": "Update SFDC opportunity page with required input.",
+          "deliverableDetails": "",
+          "notes": "",
+          "activityType": "type_1766520065758",
+          "startStage": 1.9999999999999996,
+          "endStage": 1.9999999999999996,
+          "gateOwner": "actor1"
+        },
+        {
+          "id": "act_temp_1766526452502",
+          "name": "Champion & Exec Level Sponsor Identified",
+          "start": 33.33333333333333,
+          "end": 33.33333333333333,
+          "isGate": true,
+          "isDeliverable": false,
+          "predecessor": null,
+          "predecessors": [],
+          "friction": "Inconsistent documentation in SFDC.",
+          "resolution": "Update SFDC to capture this information as part of exit criteria.",
+          "deliverableDetails": "",
+          "notes": "",
+          "activityType": "type_1766520065758",
+          "startStage": 1.9999999999999996,
+          "endStage": 1.9999999999999996,
+          "gateOwner": "actor1"
+        },
+        {
+          "id": "act_temp_1766512667153",
+          "name": "Path to funding available",
+          "start": 50,
+          "end": 50,
+          "isGate": true,
+          "isDeliverable": false,
+          "predecessor": null,
+          "predecessors": [],
+          "friction": "Inconsistent documentation in SFDC.",
+          "resolution": "Update input in SFDC as part of exit criteria.",
+          "deliverableDetails": "",
+          "notes": "Prospect has shared information on how budget / funding will be secured.",
+          "startStage": 3,
+          "endStage": 3,
+          "_stageBasedPos": true,
+          "gateOwner": "actor_1766511499381",
+          "activityType": null
+        },
+        {
+          "id": "act_temp_1766530611463",
+          "name": "Top2Top Meeting",
+          "start": 52,
+          "end": 81,
+          "isGate": false,
+          "isDeliverable": false,
+          "accountable": "actor1",
+          "responsible": [
+            "actor1",
+            "actor_1766511499381"
+          ],
+          "consulted": [],
+          "informed": [],
+          "predecessor": null,
+          "predecessors": [],
+          "friction": "Inconsistent visibility of the planning and relationships that need to be included in this step.",
+          "resolution": "Make use of tools like 100handshakes.",
+          "deliverableDetails": "",
+          "notes": "",
+          "activityType": "type_1766520065758",
+          "startStage": 3.12,
+          "endStage": 4.86,
+          "stageNotes": {
+            "s4": "AE starts to identify who needs to be included in this conversations. Also socialize the idea with the prospect to plan for it.",
+            "s_1766511390686": "Top2Top meetings are occurring and we have good visibility into path to close as well as potential obstacles."
+          }
+        },
+        {
+          "id": "act_temp_1766596976014",
+          "name": "Pricefx is Selected",
+          "start": 66.66666666666666,
+          "end": 66.66666666666666,
+          "isGate": true,
+          "isDeliverable": false,
+          "predecessor": null,
+          "predecessors": [],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "",
+          "activityType": "type_1766520065758",
+          "startStage": 3.999999999999999,
+          "endStage": 3.999999999999999,
+          "gateOwner": "actor1"
+        },
+        {
+          "id": "act_temp_1766527003500",
+          "name": "Contract Signed",
+          "start": 83.33333333333334,
+          "end": 83.33333333333334,
+          "isGate": true,
+          "isDeliverable": false,
+          "predecessor": "act_temp_1766516175905",
+          "predecessors": [
+            "act_temp_1766516175905",
+            "act_temp_1766526863006",
+            "act_temp_1766596976014"
+          ],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "",
+          "activityType": "type_1766520090486",
+          "startStage": 5.000000000000001,
+          "endStage": 5.000000000000001,
+          "gateOwner": "actor1"
+        }
+      ]
+    },
+    {
+      "id": "sl_1766522759342",
+      "name": "Agents",
+      "color": "#11ACEE",
+      "collapsed": false,
+      "sections": [],
+      "activities": [
+        {
+          "id": "act_temp_1766512432588",
+          "name": "Agents Briefing",
+          "start": 2,
+          "end": 15,
+          "isGate": false,
+          "isDeliverable": false,
+          "accountable": "actor1",
+          "responsible": [],
+          "consulted": [],
+          "informed": [],
+          "predecessor": null,
+          "predecessors": [],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "",
+          "startStage": 0.12,
+          "endStage": 0.8999999999999999,
+          "_stageBasedPos": true,
+          "activityType": "type_1766520112399",
+          "stageNotes": {
+            "s1": "The AE describes the usage of Agents as Phase 0 diagnosis to support or highlight opportunities with POM"
+          }
+        },
+        {
+          "id": "act_temp_1766525222981",
+          "name": "Agree to Provide Data",
+          "start": 16.666666666666664,
+          "end": 16.666666666666664,
+          "isGate": true,
+          "isDeliverable": false,
+          "predecessor": "act_temp_1766512432588",
+          "predecessors": [
+            "act_temp_1766512432588"
+          ],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "",
+          "activityType": null,
+          "startStage": 0.9999999999999998,
+          "endStage": 0.9999999999999998,
+          "gateOwner": "actor_1766511499381"
+        },
+        {
+          "id": "act_temp_1766522859492",
+          "name": "Data Received & Validated with Prospect",
+          "start": 18,
+          "end": 31,
+          "isGate": false,
+          "isDeliverable": false,
+          "accountable": "actor1",
+          "responsible": [
+            "actor2"
+          ],
+          "consulted": [
+            "actor_1766511499381"
+          ],
+          "informed": [],
+          "predecessor": "act_temp_1766525222981",
+          "predecessors": [
+            "act_temp_1766525222981"
+          ],
+          "friction": "Data spec might need to be updated. ",
+          "resolution": "Product team: Release self-serve tool for prospects to load and validate data.",
+          "deliverableDetails": "",
+          "notes": "",
+          "activityType": "type_1766520100814",
+          "startStage": 1.08,
+          "endStage": 1.8599999999999999,
+          "stageNotes": {
+            "s2": "Data validation helps determine if data structure will fit accelerator specifications."
+          }
+        },
+        {
+          "id": "act_temp_1766525670134",
+          "name": "Agent Setup & Dry Run",
+          "start": 26,
+          "end": 42,
+          "isGate": false,
+          "isDeliverable": false,
+          "accountable": "actor2",
+          "responsible": [],
+          "consulted": [
+            "actor_1766511499381"
+          ],
+          "informed": [],
+          "predecessor": "act_temp_1766522859492",
+          "predecessors": [
+            "act_temp_1766522859492"
+          ],
+          "friction": "Very manual process today\nLimited selection of agents to deploy\nPurpose built agents setup all manually (Copilot capabilities limited)",
+          "resolution": "MCP tools to facilitate interactive creation of agents (using external LLMs)",
+          "deliverableDetails": "",
+          "notes": "",
+          "activityType": "type_1766520112399",
+          "startStage": 1.56,
+          "endStage": 2.52,
+          "stageNotes": {
+            "s2": "Initial data validation occurs and sandbox environment is setup.",
+            "s3": "SolStrat runs selected agents with Champion with clear linking to Value to capture and how Actions in the system can enable prospect to capture that value. (i.e. LPGs, Quoting, etc)"
+          }
+        },
+        {
+          "id": "act_temp_1766525758399",
+          "name": "Agents Readout",
+          "start": 42,
+          "end": 58,
+          "isGate": false,
+          "isDeliverable": true,
+          "accountable": "actor1",
+          "responsible": [
+            "actor2"
+          ],
+          "consulted": [
+            "actor_1766511499381"
+          ],
+          "informed": [],
+          "predecessor": "act_temp_1766525670134",
+          "predecessors": [
+            "act_temp_1766525670134"
+          ],
+          "friction": "Process can vary wildly from one prospect to another. Need to find what is the approach the works the best.",
+          "resolution": "Work with SolStrat and AE team to document cases that have the most impact and chance to close agents deal.",
+          "deliverableDetails": "Summary of findings from Agents deployed.",
+          "notes": "",
+          "activityType": "type_1766520112399",
+          "startStage": 2.52,
+          "endStage": 3.4799999999999995,
+          "stageNotes": {
+            "s3": "Initial readout, focused on demonstrating quick value through low-hanging fruit actions (curated agents)",
+            "s4": "Determine if a custom agent is required and build it within the sandbox environment."
+          }
+        },
+        {
+          "id": "act_temp_1766530483295",
+          "name": "Value case with Phase 0 \"knockout\" proposal",
+          "start": 52,
+          "end": 65,
+          "isGate": false,
+          "isDeliverable": true,
+          "accountable": "actor1",
+          "responsible": [
+            "actor1",
+            "actor2"
+          ],
+          "consulted": [],
+          "informed": [],
+          "predecessor": "act_temp_1766525758399",
+          "predecessors": [
+            "act_temp_1766525758399"
+          ],
+          "friction": "Lack a document that is easy to populate with this information.",
+          "resolution": "",
+          "deliverableDetails": "Document with all the details about this proposal",
+          "notes": "",
+          "activityType": "type_1766520090486",
+          "startStage": 3.12,
+          "endStage": 3.9000000000000004,
+          "stageNotes": {
+            "s4": "We demonstrate the full ROI of an agents implementation first to guide the POM deal as a quick follow up (i.e. Agents indicate the  \"North Star\")"
+          }
+        },
+        {
+          "id": "act_temp_1766526863006",
+          "name": "Agree to Sign up Agents deal",
+          "start": 66.66666666666666,
+          "end": 66.66666666666666,
+          "isGate": true,
+          "isDeliverable": false,
+          "predecessor": "act_temp_1766525758399",
+          "predecessors": [
+            "act_temp_1766525758399",
+            "act_temp_1766530483295"
+          ],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "We have identified areas of opportunity through agents and shown how these can be used to guide evaluation (Phase 0 - Diagnosis)",
+          "activityType": "type_1766520065758",
+          "startStage": 3.999999999999999,
+          "endStage": 3.999999999999999,
+          "gateOwner": "actor1"
+        },
+        {
+          "id": "act_temp_1766855875866",
+          "name": "Agents handover",
+          "start": 77,
+          "end": 97,
+          "isGate": false,
+          "isDeliverable": true,
+          "accountable": "actor2",
+          "responsible": [
+            "actor2"
+          ],
+          "consulted": [],
+          "informed": [],
+          "predecessor": null,
+          "predecessors": [],
+          "friction": "Need to define format",
+          "resolution": "Leverage existing Monday board, work with CommOps team to create placeholder in SFDC",
+          "deliverableDetails": "Sandbox environment\nFindings readout",
+          "notes": "",
+          "stageNotes": {
+            "s_1766511390686": "Start documentation sharing with delivery team. Ensure all agents shared with prospect are clearly identified and defined as well as what was the value identified.",
+            "s_1766511408645": "Share with delivery team full documentation of agents, value identified (actions), proposal for Phase 0 implementation of agents."
+          },
+          "activityType": "type_1766520138877",
+          "startStage": 4.62,
+          "endStage": 5.82
+        }
+      ]
+    },
+    {
+      "id": "sl_1766511582440",
+      "name": "POM",
+      "color": "#FF6D3C",
+      "collapsed": false,
+      "sections": [],
+      "activities": [
+        {
+          "id": "act_temp_1766596941386",
+          "name": "RFP Management",
+          "start": 18,
+          "end": 48,
+          "isGate": false,
+          "isDeliverable": true,
+          "accountable": "actor1",
+          "responsible": [
+            "actor1",
+            "actor2"
+          ],
+          "consulted": [],
+          "informed": [],
+          "predecessor": null,
+          "predecessors": [],
+          "friction": "Procurement-led opportunities can impact the ability to conduct discovery, dry runs, reverse demos.",
+          "resolution": "Work with AEs on how to identify deals that will have actual closing opportunity vs deals that lack real decision path.",
+          "deliverableDetails": "Full RFP answer (captured in Loopio) and shared with prospect.",
+          "notes": "Receipt of RFP\nValidation of Fit\nProviding answers related to functional, IT, commercial requirements.",
+          "activityType": "type_1766520100814",
+          "startStage": 1.08,
+          "endStage": 2.88,
+          "stageNotes": {
+            "s2": "Receipt of RFP\nValidation of Fit\nProviding answers related to functional, IT, commercial requirements.",
+            "s3": "Address any remaining topics around RFP."
+          }
+        },
+        {
+          "id": "act_temp_1766514015551",
+          "name": "Conduct Discovery with Stakeholders",
+          "start": 18.000000000000004,
+          "end": 32,
+          "isGate": false,
+          "isDeliverable": true,
+          "accountable": "actor1",
+          "responsible": [
+            "actor2"
+          ],
+          "consulted": [
+            "actor1",
+            "actor_1766511499381"
+          ],
+          "informed": [],
+          "predecessor": "act_temp_1766512539274",
+          "predecessors": [
+            "act_temp_1766512539274"
+          ],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "Summary of pain points / challenges with matching value (at least initial)",
+          "notes": "",
+          "startStage": 1.0800000000000003,
+          "endStage": 1.92,
+          "_stageBasedPos": true,
+          "activityType": "type_1766520100814",
+          "stageNotes": {
+            "s2": "Focus discovery on understanding current state, identifying the top 3-5 key objectives for this initiative.\n\nExplore current systems (ERP, CRM, home grown solutions, etc)\n\nStart to identify product fit gaps"
+          }
+        },
+        {
+          "id": "act_temp_1766514172684",
+          "name": "Product Fit-Gap Analysis",
+          "start": 23,
+          "end": 32,
+          "isGate": false,
+          "isDeliverable": true,
+          "accountable": "actor2",
+          "responsible": [
+            "actor2"
+          ],
+          "consulted": [
+            "actor1",
+            "actor_1766511499381"
+          ],
+          "informed": [],
+          "predecessor": "act_temp_1766514015551",
+          "predecessors": [
+            "act_temp_1766514015551"
+          ],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "This creates an everliving document that maps functional requirements to solution capabilities and, more importantly, what needs fall outside of existing Accelerator scope.",
+          "notes": "",
+          "startStage": 1.3800000000000001,
+          "endStage": 1.92,
+          "_stageBasedPos": true,
+          "activityType": "type_1766520100814",
+          "stageNotes": {}
+        },
+        {
+          "id": "act_temp_1766527212539",
+          "name": "Reverse Demo",
+          "start": 29,
+          "end": 40,
+          "isGate": false,
+          "isDeliverable": false,
+          "accountable": "actor1",
+          "responsible": [
+            "actor2"
+          ],
+          "consulted": [],
+          "informed": [],
+          "predecessor": "act_temp_1766514015551",
+          "predecessors": [
+            "act_temp_1766514015551"
+          ],
+          "friction": "Not all prospects will agree to a reverse demo.",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "",
+          "activityType": "type_1766520100814",
+          "startStage": 1.7399999999999998,
+          "endStage": 2.4000000000000004,
+          "stageNotes": {
+            "s2": "Additional validation on top of Discovery to understand current state and layout functional requirements tied to value proposition. (i.e. how are we going to make the current state better)",
+            "s3": "Additional discussions as necessary to clarify functional requirements (post qualification)"
+          }
+        },
+        {
+          "id": "act_temp_1766527116687",
+          "name": "Initial Product Fit Aligned",
+          "start": 33.33333333333333,
+          "end": 33.33333333333333,
+          "isGate": true,
+          "isDeliverable": false,
+          "predecessor": "act_temp_1766514172684",
+          "predecessors": [
+            "act_temp_1766514172684"
+          ],
+          "friction": "Inconsistent documentation process",
+          "resolution": "Make review of these artifacts during pipeline review calls.\n\nCreate easy to spot flags (SFDC / Monday) to highlight opportunities that are missing these artifacts.",
+          "deliverableDetails": "",
+          "notes": "Gate for Stage 1 to Stage 2: Do we have good alignment on product fit, any identified gaps are not significant enough to warrant disqualification of opportunity.",
+          "activityType": "type_1766520100814",
+          "startStage": 1.9999999999999996,
+          "endStage": 1.9999999999999996,
+          "gateOwner": "actor2"
+        },
+        {
+          "id": "act_temp_1766527381109",
+          "name": "Dry Runs with Stakeholders",
+          "start": 36,
+          "end": 49,
+          "isGate": false,
+          "isDeliverable": false,
+          "accountable": "actor1",
+          "responsible": [
+            "actor2"
+          ],
+          "consulted": [],
+          "informed": [],
+          "predecessor": "act_temp_1766514015551",
+          "predecessors": [
+            "act_temp_1766514015551",
+            "act_temp_1766514172684"
+          ],
+          "friction": "Procurement led opportunities can limit dry runs with business team",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "",
+          "activityType": "type_1766520112399",
+          "startStage": 2.16,
+          "endStage": 2.94,
+          "stageNotes": {
+            "s3": "Perform at least one dry run that shows:\n- What we've heard\n- Proposal for solution vision\n- Full path of what we expect to show\n- Mapping to value"
+          }
+        },
+        {
+          "id": "act_temp_1766596932540",
+          "name": "POC Requirements / Setup",
+          "start": 46,
+          "end": 60,
+          "isGate": false,
+          "isDeliverable": false,
+          "accountable": "actor2",
+          "responsible": [
+            "actor2"
+          ],
+          "consulted": [],
+          "informed": [],
+          "predecessor": "act_temp_1766514172684",
+          "predecessors": [
+            "act_temp_1766514172684"
+          ],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "Begin analysis of PoC early in the process.",
+          "activityType": "type_1766520100814",
+          "startStage": 2.7600000000000002,
+          "endStage": 3.5999999999999996,
+          "stageNotes": {
+            "s3": "Determine the need to create a PoC request (i.e. key functional requirements are not readily available in demo environments)",
+            "s4": "Work with prospect to clarify level of detail in functional requirements for a PoC. \nWork with demo team to setup PoC and ready it for a dry run."
+          }
+        },
+        {
+          "id": "act_temp_1766529811011",
+          "name": "Functional Value Alignment",
+          "start": 50,
+          "end": 50,
+          "isGate": true,
+          "isDeliverable": false,
+          "predecessor": "act_temp_1766527381109",
+          "predecessors": [
+            "act_temp_1766527381109"
+          ],
+          "friction": "Lack of documentation to test this exit gate",
+          "resolution": "Leverage Monday / Salesforce to document alignment.",
+          "deliverableDetails": "",
+          "notes": "Prospect confirms that we have alignment in value based on functional requirements after Dry runs",
+          "activityType": null,
+          "startStage": 3,
+          "endStage": 3,
+          "gateOwner": "actor2"
+        },
+        {
+          "id": "act_temp_1766522552151",
+          "name": "Value Based Demo",
+          "start": 51,
+          "end": 61,
+          "isGate": false,
+          "isDeliverable": true,
+          "accountable": "actor2",
+          "responsible": [
+            "actor1",
+            "actor2"
+          ],
+          "consulted": [],
+          "informed": [],
+          "predecessor": "act_temp_1766527381109",
+          "predecessors": [
+            "act_temp_1766527381109",
+            "act_temp_1766529811011"
+          ],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "",
+          "startStage": 3.06,
+          "endStage": 3.66,
+          "_stageBasedPos": true,
+          "activityType": "type_1766520112399",
+          "stageNotes": {
+            "s4": "Conduct demo to prospect for key functional requirements with clear mapping to value."
+          }
+        },
+        {
+          "id": "act_temp_1766728181888",
+          "name": "Conduct PoC Demo",
+          "start": 56,
+          "end": 65,
+          "isGate": false,
+          "isDeliverable": false,
+          "accountable": "actor2",
+          "responsible": [
+            "actor1",
+            "actor2"
+          ],
+          "consulted": [],
+          "informed": [],
+          "predecessor": "act_temp_1766529811011",
+          "predecessors": [
+            "act_temp_1766529811011"
+          ],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "",
+          "notes": "",
+          "activityType": "type_1766520112399",
+          "startStage": 3.3600000000000003,
+          "endStage": 3.9000000000000004,
+          "stageNotes": {
+            "s4": "Conduct demo to prospect for key functional requirements from PoC with clear mapping to value."
+          }
+        },
+        {
+          "id": "act_temp_1766516175905",
+          "name": "Technical Win",
+          "start": 66.66666666666666,
+          "end": 66.66666666666666,
+          "isGate": true,
+          "isDeliverable": true,
+          "predecessor": "act_temp_1766522552151",
+          "predecessors": [
+            "act_temp_1766522552151",
+            "act_temp_1766728181888"
+          ],
+          "friction": "",
+          "resolution": "",
+          "deliverableDetails": "Full documentation of all functional requirements including:\n- Demo assets (standard & PoC)\n- Mapping to catalog of use cases\n- Mapping to value case (Mediafly / Cuvama)\n- Relevant notes, recordings, transcripts, etc.",
+          "notes": "",
+          "startStage": 3.999999999999999,
+          "endStage": 3.999999999999999,
+          "_stageBasedPos": true,
+          "gateOwner": "actor2",
+          "activityType": null
+        },
+        {
+          "id": "act_temp_1766855773853",
+          "name": "Handover Protocol",
+          "start": 76,
+          "end": 98,
+          "isGate": false,
+          "isDeliverable": true,
+          "accountable": "actor1",
+          "responsible": [
+            "actor2"
+          ],
+          "consulted": [],
+          "informed": [],
+          "predecessor": null,
+          "predecessors": [],
+          "friction": "Need to define a handover protocol.",
+          "resolution": "Work with delivery team and ecosystem team on a format.",
+          "deliverableDetails": "Full documentation of functional requirements (Demo, PoC assets, etc)",
+          "notes": "",
+          "stageNotes": {},
+          "activityType": "type_1766520138877",
+          "startStage": 4.5600000000000005,
+          "endStage": 5.88
+        }
+      ]
+    }
+  ],
+  "activityTypes": [
+    {
+      "id": "type_1766520065758",
+      "name": "DECISION PATH",
+      "color": "#a371f7"
+    },
+    {
+      "id": "type_1766520090486",
+      "name": "COMMERCIALS",
+      "color": "#56d364"
+    },
+    {
+      "id": "type_1766520100814",
+      "name": "PRODUCT FIT",
+      "color": "#58a6ff"
+    },
+    {
+      "id": "type_1766520112399",
+      "name": "VALUE CASE",
+      "color": "#F7DC6F"
+    },
+    {
+      "id": "type_1766520138877",
+      "name": "HANDOVER",
+      "color": "#f0883e"
+    }
+  ],
+  "activityColumnWidth": 380
+}
