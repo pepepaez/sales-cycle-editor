@@ -1,3 +1,5 @@
 *.json
+*.txt
 PFX*.html
 example-*.html
+RACI_CHANGES.md
